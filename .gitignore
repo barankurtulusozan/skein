@@ -17,3 +17,8 @@ build/
 .env
 .env.*
 !.env.example
+
+# Playwright
+playwright-report/
+test-results/
+
