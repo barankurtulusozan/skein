@@ -94,6 +94,19 @@ importers:
 
   packages/engine:
     dependencies:
+      '@skein/nodes':
+        specifier: workspace:*
+        version: link:../nodes
+      '@skein/schema':
+        specifier: workspace:*
+        version: link:../schema
+    devDependencies:
+      typescript:
+        specifier: ^5.4.5
+        version: 5.9.3
+
+  packages/nodes:
+    dependencies:
       '@skein/schema':
         specifier: workspace:*
         version: link:../schema

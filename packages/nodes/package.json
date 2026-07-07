@@ -1,16 +1,14 @@
 {
-  "name": "@skein/engine",
+  "name": "@skein/nodes",
   "version": "0.1.0",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc",
-    "test": "vitest run"
+    "build": "tsc"
   },
   "dependencies": {
-    "@skein/schema": "workspace:*",
-    "@skein/nodes": "workspace:*"
+    "@skein/schema": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.4.5"
