@@ -1,7 +1,12 @@
-import { Workflow, WorkflowNode, WorkflowEdge, NodeRunResult } from '@skein/schema';
-import { NODE_EXECUTORS } from '@skein/nodes';
-import { topoSort } from './topoSort';
-import { EventEmitter } from './eventEmitter';
+import {
+  Workflow,
+  WorkflowNode,
+  WorkflowEdge,
+  NodeRunResult,
+} from "@skein/schema";
+import { NODE_EXECUTORS } from "@skein/nodes";
+import { topoSort } from "./topoSort";
+import { EventEmitter } from "./eventEmitter";
 
 export class WorkflowExecutor extends EventEmitter {
   private workflow: Workflow;
@@ -12,17 +17,19 @@ export class WorkflowExecutor extends EventEmitter {
     this.workflow = workflow;
   }
 
-  async execute(initialPayload: Record<string, any> = {}): Promise<Record<string, NodeRunResult>> {
+  async execute(
+    initialPayload: Record<string, any> = {},
+  ): Promise<Record<string, NodeRunResult>> {
     // 1. Verify there are no cycles (topoSort throws if cyclic)
     topoSort(this.workflow);
 
-    this.emit('run:start', this.workflow.id);
+    this.emit("run:start", this.workflow.id);
 
     // Initialize all node results
     this.workflow.nodes.forEach((node) => {
       this.results[node.id] = {
         nodeId: node.id,
-        status: 'idle',
+        status: "idle",
       };
     });
 
@@ -60,7 +67,11 @@ export class WorkflowExecutor extends EventEmitter {
         let activeIncomingCount = 0;
         edges.forEach((edge) => {
           const parentResult = this.results[edge.source];
-          if (parentResult && parentResult.status === 'success' && parentResult.output) {
+          if (
+            parentResult &&
+            parentResult.status === "success" &&
+            parentResult.output
+          ) {
             const val = parentResult.output[edge.sourceHandle];
             if (val !== undefined) {
               inputs[edge.targetHandle] = val;
@@ -73,19 +84,19 @@ export class WorkflowExecutor extends EventEmitter {
         if (activeIncomingCount === 0) {
           isSkipped = true;
         }
-      } else if (!isSkipped && node.type === 'manual-trigger') {
+      } else if (!isSkipped && node.type === "manual-trigger") {
         inputs.payload = initialPayload;
       }
 
       if (isSkipped) {
         this.results[nodeId] = {
           nodeId,
-          status: 'skipped',
+          status: "skipped",
           startedAt: Date.now(),
           finishedAt: Date.now(),
         };
-        this.emit('node:skipped', nodeId);
-        
+        this.emit("node:skipped", nodeId);
+
         // Propagate skipped state to all downstream nodes
         adjList[nodeId].forEach((childId) => {
           skippedNodes.add(childId);
@@ -93,10 +104,10 @@ export class WorkflowExecutor extends EventEmitter {
       } else {
         this.results[nodeId] = {
           nodeId,
-          status: 'running',
+          status: "running",
           startedAt: Date.now(),
         };
-        this.emit('node:start', nodeId);
+        this.emit("node:start", nodeId);
 
         try {
           const executor = NODE_EXECUTORS[node.type];
@@ -105,26 +116,26 @@ export class WorkflowExecutor extends EventEmitter {
           }
 
           const output = await executor(node.config || {}, inputs);
-          
+
           this.results[nodeId] = {
             nodeId,
-            status: 'success',
+            status: "success",
             output,
             startedAt: this.results[nodeId].startedAt,
             finishedAt: Date.now(),
           };
-          this.emit('node:success', nodeId, output);
+          this.emit("node:success", nodeId, output);
         } catch (err: any) {
           const errMsg = err.message || String(err);
           this.results[nodeId] = {
             nodeId,
-            status: 'error',
+            status: "error",
             error: errMsg,
             startedAt: this.results[nodeId].startedAt,
             finishedAt: Date.now(),
           };
-          this.emit('node:error', nodeId, errMsg);
-          
+          this.emit("node:error", nodeId, errMsg);
+
           // Mark all remaining downstream children as skipped
           const skipDownstream = (id: string) => {
             adjList[id].forEach((childId) => {
@@ -135,8 +146,10 @@ export class WorkflowExecutor extends EventEmitter {
             });
           };
           skipDownstream(nodeId);
-          
-          runErrorOccurred = new Error(`Node execution failed at node "${nodeId}": ${errMsg}`);
+
+          runErrorOccurred = new Error(
+            `Node execution failed at node "${nodeId}": ${errMsg}`,
+          );
         }
       }
 
@@ -167,11 +180,11 @@ export class WorkflowExecutor extends EventEmitter {
     await Promise.all(initialPromises);
 
     if (runErrorOccurred) {
-      this.emit('run:error', runErrorOccurred.message);
+      this.emit("run:error", runErrorOccurred.message);
       throw runErrorOccurred;
     }
 
-    this.emit('run:complete', this.results);
+    this.emit("run:complete", this.results);
     return this.results;
   }
 }

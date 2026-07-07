@@ -1,6 +1,13 @@
-import { z } from 'zod';
+import { z } from "zod";
 
-export const NodeRunStatusSchema = z.enum(['idle', 'queued', 'running', 'success', 'error', 'skipped']);
+export const NodeRunStatusSchema = z.enum([
+  "idle",
+  "queued",
+  "running",
+  "success",
+  "error",
+  "skipped",
+]);
 
 export const NodeRunResultSchema = z.object({
   nodeId: z.string(),

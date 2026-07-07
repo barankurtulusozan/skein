@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useCallback } from 'react';
+import React, { useRef, useEffect, useCallback } from "react";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -6,49 +6,59 @@ import {
   Controls,
   MiniMap,
   useReactFlow,
-} from '@xyflow/react';
-import '@xyflow/react/dist/style.css';
+} from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
 
-import { useWorkflowStore } from './store/useWorkflowStore';
-import CustomNode from './components/CustomNode';
-import Topbar from './components/Topbar';
-import Sidebar from './components/Sidebar';
-import Toast from './components/Toast';
+import { useWorkflowStore } from "./store/useWorkflowStore";
+import CustomNode from "./components/CustomNode";
+import Topbar from "./components/Topbar";
+import Sidebar from "./components/Sidebar";
+import Toast from "./components/Toast";
 
 // Register custom node type mapping
 const nodeTypes = {
-  'manual-trigger': CustomNode,
-  'webhook-trigger': CustomNode,
-  'schedule-trigger': CustomNode,
-  'http-request': CustomNode,
-  'delay': CustomNode,
-  'condition': CustomNode,
-  'loop': CustomNode,
-  'transform': CustomNode,
-  'llm-prompt': CustomNode,
-  'tool-call': CustomNode,
-  'log-debug': CustomNode,
+  "manual-trigger": CustomNode,
+  "webhook-trigger": CustomNode,
+  "schedule-trigger": CustomNode,
+  "http-request": CustomNode,
+  delay: CustomNode,
+  condition: CustomNode,
+  loop: CustomNode,
+  transform: CustomNode,
+  "llm-prompt": CustomNode,
+  "tool-call": CustomNode,
+  "log-debug": CustomNode,
 };
 
 function WorkflowCanvas() {
-  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, onNodeDragStop, addNode, undo, redo } = useWorkflowStore();
+  const {
+    nodes,
+    edges,
+    onNodesChange,
+    onEdgesChange,
+    onConnect,
+    onNodeDragStop,
+    addNode,
+    undo,
+    redo,
+  } = useWorkflowStore();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { screenToFlowPosition } = useReactFlow();
 
   // Drag and drop handlers
   const onDragOver = useCallback((event: React.DragEvent) => {
     event.preventDefault();
-    event.dataTransfer.dropEffect = 'move';
+    event.dataTransfer.dropEffect = "move";
   }, []);
 
   const onDrop = useCallback(
     (event: React.DragEvent) => {
       event.preventDefault();
 
-      const type = event.dataTransfer.getData('application/reactflow');
+      const type = event.dataTransfer.getData("application/reactflow");
 
       // Check if dropped element is valid
-      if (typeof type === 'undefined' || !type) {
+      if (typeof type === "undefined" || !type) {
         return;
       }
 
@@ -60,7 +70,7 @@ function WorkflowCanvas() {
 
       addNode(type, position);
     },
-    [screenToFlowPosition, addNode]
+    [screenToFlowPosition, addNode],
   );
 
   // Global Keyboard Shortcuts (Undo/Redo)
@@ -70,30 +80,34 @@ function WorkflowCanvas() {
       const activeElement = document.activeElement;
       if (
         activeElement &&
-        (activeElement.tagName === 'INPUT' ||
-          activeElement.tagName === 'TEXTAREA' ||
-          activeElement.tagName === 'SELECT')
+        (activeElement.tagName === "INPUT" ||
+          activeElement.tagName === "TEXTAREA" ||
+          activeElement.tagName === "SELECT")
       ) {
         return;
       }
 
       // Undo: Ctrl/Cmd + Z
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+      if (
+        (e.ctrlKey || e.metaKey) &&
+        e.key.toLowerCase() === "z" &&
+        !e.shiftKey
+      ) {
         e.preventDefault();
         undo();
       }
       // Redo: Ctrl/Cmd + Y or Ctrl/Cmd + Shift + Z
       if (
-        ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') ||
-        ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z')
+        ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "y") ||
+        ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "z")
       ) {
         e.preventDefault();
         redo();
       }
     };
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [undo, redo]);
 
   return (
@@ -117,7 +131,11 @@ function WorkflowCanvas() {
         <Background color="#2A2F3A" gap={16} size={1.2} />
         <Controls className="!bg-surface !border-outline !text-text-primary fill-current [&_button]:!bg-transparent [&_button]:!border-outline [&_button]:!text-text-primary [&_svg]:!fill-text-primary" />
         <MiniMap
-          style={{ background: '#171B22', border: '1px solid #2A2F3A', borderRadius: '12px' }}
+          style={{
+            background: "#171B22",
+            border: "1px solid #2A2F3A",
+            borderRadius: "12px",
+          }}
           nodeColor="#2A2F3A"
           maskColor="rgba(14, 17, 22, 0.7)"
           nodeStrokeWidth={3}

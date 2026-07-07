@@ -1,21 +1,47 @@
-import React, { useState } from 'react';
-import { NODE_DEFINITIONS, UINodeDefinition } from '../constants/nodeDefinitions';
+import React, { useState } from "react";
+import {
+  NODE_DEFINITIONS,
+  UINodeDefinition,
+} from "../constants/nodeDefinitions";
 
 export default function Sidebar() {
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState("");
 
   const onDragStart = (event: React.DragEvent, nodeType: string) => {
-    event.dataTransfer.setData('application/reactflow', nodeType);
-    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData("application/reactflow", nodeType);
+    event.dataTransfer.effectAllowed = "move";
   };
 
   // Group node definitions by category
-  const categories: Record<string, { label: string; color: string; items: UINodeDefinition[] }> = {
-    trigger: { label: 'Triggers', color: 'border-success/30 text-success', items: [] },
-    action: { label: 'Actions', color: 'border-primary/30 text-primary', items: [] },
-    logic: { label: 'Logic', color: 'border-running/30 text-running', items: [] },
-    ai: { label: 'AI & Agents', color: 'border-purple-500/30 text-purple-400', items: [] },
-    output: { label: 'Outputs', color: 'border-warning/30 text-warning', items: [] },
+  const categories: Record<
+    string,
+    { label: string; color: string; items: UINodeDefinition[] }
+  > = {
+    trigger: {
+      label: "Triggers",
+      color: "border-success/30 text-success",
+      items: [],
+    },
+    action: {
+      label: "Actions",
+      color: "border-primary/30 text-primary",
+      items: [],
+    },
+    logic: {
+      label: "Logic",
+      color: "border-running/30 text-running",
+      items: [],
+    },
+    ai: {
+      label: "AI & Agents",
+      color: "border-purple-500/30 text-purple-400",
+      items: [],
+    },
+    output: {
+      label: "Outputs",
+      color: "border-warning/30 text-warning",
+      items: [],
+    },
   };
 
   Object.values(NODE_DEFINITIONS).forEach((node) => {
@@ -42,8 +68,18 @@ export default function Sidebar() {
             placeholder="Search nodes..."
             className="w-full bg-background border border-outline rounded-lg py-2 pl-9 pr-4 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-primary transition-all font-sans"
           />
-          <svg className="w-4 h-4 text-text-muted absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          <svg
+            className="w-4 h-4 text-text-muted absolute left-3 top-2.5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            strokeWidth="2"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+            />
           </svg>
         </div>
       </div>
@@ -54,7 +90,9 @@ export default function Sidebar() {
           if (cat.items.length === 0) return null;
           return (
             <div key={key} className="space-y-2">
-              <h3 className={`text-xs font-mono uppercase tracking-widest font-semibold ${cat.color.split(' ')[1]}`}>
+              <h3
+                className={`text-xs font-mono uppercase tracking-widest font-semibold ${cat.color.split(" ")[1]}`}
+              >
                 {cat.label}
               </h3>
               <div className="grid grid-cols-1 gap-2">

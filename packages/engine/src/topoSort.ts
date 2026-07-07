@@ -1,4 +1,4 @@
-import { Workflow } from '@skein/schema';
+import { Workflow } from "@skein/schema";
 
 export function topoSort(workflow: Workflow): string[] {
   const nodeIds = workflow.nodes.map((n) => n.id);
@@ -14,7 +14,7 @@ export function topoSort(workflow: Workflow): string[] {
   // Populate graph dependencies from edges
   workflow.edges.forEach((edge) => {
     const { source, target } = edge;
-    
+
     // Ignore edges targeting or sourcing from non-existent nodes
     if (adjList[source] && inDegree[target] !== undefined) {
       adjList[source].push(target);
@@ -52,9 +52,9 @@ export function topoSort(workflow: Workflow): string[] {
     const nodeNames = workflow.nodes
       .filter((n) => cyclicNodeIds.includes(n.id))
       .map((n) => `"${n.type}" (ID: ${n.id})`);
-    
+
     throw new Error(
-      `Workflow execution aborted: Cycle detected in graph containing nodes: ${nodeNames.join(', ')}`
+      `Workflow execution aborted: Cycle detected in graph containing nodes: ${nodeNames.join(", ")}`,
     );
   }
 
