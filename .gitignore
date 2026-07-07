@@ -22,3 +22,9 @@ build/
 playwright-report/
 test-results/
 
+# Agent
+.agent/
+.agents/
+.superpowers/
+
+
