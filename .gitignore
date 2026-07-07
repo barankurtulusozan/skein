@@ -1,0 +1,19 @@
+# Dependency directories
+node_modules/
+
+# Build outputs
+dist/
+build/
+.turbo/
+
+# OS files
+.DS_Store
+
+# IDE configs
+.idea/
+.vscode/
+
+# Environment files
+.env
+.env.*
+!.env.example

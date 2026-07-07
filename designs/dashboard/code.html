@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Skein Dashboard</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&amp;family=JetBrains+Mono:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-primary-fixed": "#2d1600",
+                        "on-secondary-fixed": "#001a43",
+                        "on-tertiary-container": "#004e61",
+                        "inverse-primary": "#8b5006",
+                        "secondary": "#aec6ff",
+                        "on-secondary-fixed-variant": "#004397",
+                        "tertiary-fixed": "#b6ebff",
+                        "on-surface-variant": "#d7c3b3",
+                        "surface-variant": "#2e353e",
+                        "background": "#0d141c",
+                        "primary": "#ffc794",
+                        "on-background": "#dce3ef",
+                        "surface-container-lowest": "#080f17",
+                        "tertiary-fixed-dim": "#76d3f2",
+                        "surface-bright": "#333a43",
+                        "on-primary-container": "#6b3c00",
+                        "inverse-on-surface": "#2a313a",
+                        "on-error": "#690005",
+                        "primary-fixed": "#ffdcbf",
+                        "error": "#ffb4ab",
+                        "surface-tint": "#ffb873",
+                        "on-tertiary-fixed": "#001f28",
+                        "inverse-surface": "#dce3ef",
+                        "secondary-container": "#024ead",
+                        "surface": "#0d141c",
+                        "surface-dim": "#0d141c",
+                        "on-surface": "#dce3ef",
+                        "on-secondary": "#002e6b",
+                        "on-error-container": "#ffdad6",
+                        "outline-variant": "#524438",
+                        "surface-container-low": "#151c24",
+                        "tertiary": "#81defe",
+                        "on-primary-fixed-variant": "#6a3b00",
+                        "on-tertiary-fixed-variant": "#004e60",
+                        "surface-container-highest": "#2e353e",
+                        "outline": "#9f8d7f",
+                        "secondary-fixed": "#d8e2ff",
+                        "primary-container": "#f2a65a",
+                        "surface-container": "#192029",
+                        "surface-container-high": "#242b33",
+                        "error-container": "#93000a",
+                        "primary-fixed-dim": "#ffb873",
+                        "on-tertiary": "#003543",
+                        "tertiary-container": "#64c2e1",
+                        "on-secondary-container": "#aec6ff",
+                        "secondary-fixed-dim": "#aec6ff",
+                        "on-primary": "#4b2800",
+                        "success": "#3DDC97",
+                        "failure": "#FF6B6B",
+                        "running": "#5B8DEF",
+                        "idle": "#8b949e",
+                        "border-color": "#2A2F3A"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.25rem",
+                        "lg": "0.5rem",
+                        "xl": "0.75rem",
+                        "full": "9999px"
+                    },
+                    "spacing": {
+                        "card-padding": "16px",
+                        "stack-gap": "12px",
+                        "inline-gap": "8px",
+                        "screen-padding": "16px"
+                    },
+                    "fontFamily": {
+                        "h1": ["Inter"],
+                        "h1-mobile": ["Inter"],
+                        "code-sm": ["JetBrains Mono"],
+                        "body-lg": ["Inter"],
+                        "body-md": ["Inter"],
+                        "label-mono": ["JetBrains Mono"],
+                        "h2": ["Inter"]
+                    },
+                    "fontSize": {
+                        "h1": ["24px", { "lineHeight": "32px", "letterSpacing": "-0.02em", "fontWeight": "700" }],
+                        "h1-mobile": ["20px", { "lineHeight": "28px", "fontWeight": "700" }],
+                        "code-sm": ["12px", { "lineHeight": "16px", "fontWeight": "400" }],
+                        "body-lg": ["16px", { "lineHeight": "24px", "fontWeight": "400" }],
+                        "body-md": ["14px", { "lineHeight": "20px", "fontWeight": "400" }],
+                        "label-mono": ["13px", { "lineHeight": "18px", "letterSpacing": "0.02em", "fontWeight": "500" }],
+                        "h2": ["20px", { "lineHeight": "28px", "letterSpacing": "-0.01em", "fontWeight": "600" }]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+        body { background-color: #0d141c; color: #dce3ef; }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .sparkline-dot { width: 4px; height: 4px; border-radius: 50%; }
+        .status-pill-success { background-color: rgba(61, 220, 151, 0.15); color: #3DDC97; }
+        .status-pill-failed { background-color: rgba(255, 107, 107, 0.15); color: #FF6B6B; }
+        .status-pill-running { background-color: rgba(91, 141, 239, 0.15); color: #5B8DEF; }
+        .status-pill-idle { background-color: rgba(139, 148, 158, 0.15); color: #8b949e; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body-md antialiased pb-24">
+<!-- TopAppBar -->
+<header class="fixed top-0 w-full z-50 flex justify-between items-center px-screen-padding h-16 bg-background dark:bg-background border-b border-outline-variant dark:border-outline-variant">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-primary dark:text-primary">terminal</span>
+<span class="font-h2 text-h2 font-bold tracking-tight text-primary dark:text-primary">Skein</span>
+</div>
+<div class="flex items-center gap-inline-gap">
+<div class="w-2 h-2 rounded-full bg-success"></div>
+<button aria-label="Notifications" class="text-on-surface-variant hover:bg-surface-variant/50 transition-colors rounded-full p-2 active:opacity-80 transition-opacity">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+</div>
+</header>
+<!-- Main Content Canvas -->
+<main class="pt-[80px] px-screen-padding">
+<!-- Filter Chips -->
+<div class="flex overflow-x-auto hide-scrollbar gap-inline-gap mb-4 pb-2">
+<button class="px-4 py-1.5 rounded-full bg-primary-container text-on-primary-container font-label-mono text-label-mono whitespace-nowrap">All</button>
+<button class="px-4 py-1.5 rounded-full border border-border-color bg-surface-container text-on-surface-variant font-label-mono text-label-mono whitespace-nowrap">Running</button>
+<button class="px-4 py-1.5 rounded-full border border-border-color bg-surface-container text-on-surface-variant font-label-mono text-label-mono whitespace-nowrap">Failed today</button>
+<button class="px-4 py-1.5 rounded-full border border-border-color bg-surface-container text-on-surface-variant font-label-mono text-label-mono whitespace-nowrap">Scheduled</button>
+</div>
+<!-- Workflow Cards List -->
+<div class="flex flex-col gap-stack-gap">
+<!-- Card 1 -->
+<div class="bg-[#171B22] border border-border-color rounded-lg p-card-padding">
+<div class="flex justify-between items-start mb-2">
+<h3 class="font-h2 text-h2 text-[#F5F6F8]">Daily Content Digest</h3>
+<span class="px-2 py-0.5 rounded-full status-pill-success font-label-mono text-label-mono uppercase">SUCCESS</span>
+</div>
+<div class="flex justify-between items-center text-on-surface-variant font-code-sm text-code-sm mb-4">
+<span>1h ago</span>
+<span>Next: 23h</span>
+</div>
+<div class="flex gap-1 items-center">
+<div class="sparkline-dot bg-success"></div><div class="sparkline-dot bg-success"></div><div class="sparkline-dot bg-success"></div><div class="sparkline-dot bg-success"></div><div class="sparkline-dot bg-failure"></div><div class="sparkline-dot bg-success"></div><div class="sparkline-dot bg-success"></div><div class="sparkline-dot bg-success"></div><div class="sparkline-dot bg-success"></div><div class="sparkline-dot bg-success"></div>
+</div>
+</div>
+<!-- Card 2 -->
+<div class="bg-[#171B22] border border-border-color rounded-lg p-card-padding">
+<div class="flex justify-between items-start mb-2">
+<h3 class="font-h2 text-h2 text-[#F5F6F8]">Support Ticket Triage (AI)</h3>
+<span class="px-2 py-0.5 rounded-full status-pill-running font-label-mono text-label-mono uppercase flex items-center gap-1">
+<span class="w-1.5 h-1.5 rounded-full bg-running animate-pulse"></span> RUNNING
+                    </span>
+</div>
+<div class="flex justify-between items-center text-on-surface-variant font-code-sm text-code-sm mb-4">
+<span>Now</span>
+<span>Next: -</span>
+</div>
+<div class="flex gap-1 items-center">
+<div class="sparkline-dot bg-success"></div><div class="sparkline-dot bg-success"></div><div class="sparkline-dot bg-failure"></div><div class="sparkline-dot bg-success"></div><div class="sparkline-dot bg-success"></div><div class="sparkline-dot bg-success"></div><div class="sparkline-dot bg-success"></div><div class="sparkline-dot bg-success"></div><div class="sparkline-dot bg-success"></div><div class="sparkline-dot bg-running animate-pulse"></div>
+</div>
+</div>
+<!-- Card 3 -->
+<div class="bg-[#171B22] border border-border-color rounded-lg p-card-padding">
+<div class="flex justify-between items-start mb-2">
+<h3 class="font-h2 text-h2 text-[#F5F6F8]">New Signup → Slack Alert</h3>
+<span class="px-2 py-0.5 rounded-full status-pill-failed font-label-mono text-label-mono uppercase">FAILED</span>
+</div>
+<div class="flex justify-between items-center text-on-surface-variant font-code-sm text-code-sm mb-4">
+<span>15m ago</span>
+<span>Next: Auto-retry</span>
+</div>
+<div class="flex gap-1 items-center">
+<div class="sparkline-dot bg-success"></div><div class="sparkline-dot bg-success"></div><div class="sparkline-dot bg-success"></div><div class="sparkline-dot bg-success"></div><div class="sparkline-dot bg-success"></div><div class="sparkline-dot bg-success"></div><div class="sparkline-dot bg-success"></div><div class="sparkline-dot bg-success"></div><div class="sparkline-dot bg-success"></div><div class="sparkline-dot bg-failure"></div>
+</div>
+</div>
+<!-- Card 4 -->
+<div class="bg-[#171B22] border border-border-color rounded-lg p-card-padding">
+<div class="flex justify-between items-start mb-2">
+<h3 class="font-h2 text-h2 text-[#F5F6F8]">Weekly Report Generator</h3>
+<span class="px-2 py-0.5 rounded-full status-pill-idle font-label-mono text-label-mono uppercase">IDLE</span>
+</div>
+<div class="flex justify-between items-center text-on-surface-variant font-code-sm text-code-sm mb-4">
+<span>Yesterday</span>
+<span>Next: 6d</span>
+</div>
+<div class="flex gap-1 items-center">
+<div class="sparkline-dot bg-success"></div><div class="sparkline-dot bg-success"></div><div class="sparkline-dot bg-success"></div><div class="sparkline-dot bg-success"></div><div class="sparkline-dot bg-success"></div><div class="sparkline-dot bg-success"></div><div class="sparkline-dot bg-success"></div><div class="sparkline-dot bg-success"></div><div class="sparkline-dot bg-success"></div><div class="sparkline-dot bg-success"></div>
+</div>
+</div>
+<!-- Card 5 -->
+<div class="bg-[#171B22] border border-border-color rounded-lg p-card-padding">
+<div class="flex justify-between items-start mb-2">
+<h3 class="font-h2 text-h2 text-[#F5F6F8]">Webhook → CRM Sync</h3>
+<span class="px-2 py-0.5 rounded-full status-pill-success font-label-mono text-label-mono uppercase">SUCCESS</span>
+</div>
+<div class="flex justify-between items-center text-on-surface-variant font-code-sm text-code-sm mb-4">
+<span>45m ago</span>
+<span>Next: 15m</span>
+</div>
+<div class="flex gap-1 items-center">
+<div class="sparkline-dot bg-success"></div><div class="sparkline-dot bg-success"></div><div class="sparkline-dot bg-success"></div><div class="sparkline-dot bg-failure"></div><div class="sparkline-dot bg-success"></div><div class="sparkline-dot bg-success"></div><div class="sparkline-dot bg-success"></div><div class="sparkline-dot bg-success"></div><div class="sparkline-dot bg-success"></div><div class="sparkline-dot bg-success"></div>
+</div>
+</div>
+</div>
+</main>
+<!-- FAB -->
+<button aria-label="Add Workflow" class="fixed bottom-[80px] right-screen-padding w-14 h-14 bg-primary-container text-on-primary-container rounded-full flex items-center justify-center shadow-lg active:scale-95 transition-transform duration-150 z-40">
+<span class="material-symbols-outlined text-2xl font-bold">add</span>
+</button>
+<!-- BottomNavBar -->
+<nav class="fixed bottom-0 w-full z-50 flex justify-around items-center h-16 bg-surface dark:bg-surface px-screen-padding border-t border-outline-variant dark:border-outline-variant md:hidden">
+<button class="flex flex-col items-center justify-center text-primary dark:text-primary active:scale-95 transition-transform duration-150 group">
+<span class="material-symbols-outlined mb-1 group-hover:text-primary-container transition-colors" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+<span class="font-body-md text-body-md text-[10px] leading-tight">Dashboard</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant hover:text-primary-container transition-colors active:scale-95 transition-transform duration-150 group">
+<span class="material-symbols-outlined mb-1 group-hover:text-primary-container transition-colors">history</span>
+<span class="font-body-md text-body-md text-[10px] leading-tight">Runs</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant hover:text-primary-container transition-colors active:scale-95 transition-transform duration-150 group">
+<span class="material-symbols-outlined mb-1 group-hover:text-primary-container transition-colors">bolt</span>
+<span class="font-body-md text-body-md text-[10px] leading-tight">Trigger</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant dark:text-on-surface-variant hover:text-primary-container transition-colors active:scale-95 transition-transform duration-150 group">
+<span class="material-symbols-outlined mb-1 group-hover:text-primary-container transition-colors">settings</span>
+<span class="font-body-md text-body-md text-[10px] leading-tight">Settings</span>
+</button>
+</nav>
+</body></html>

@@ -1,0 +1,22 @@
+{
+  "name": "@skein/server",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "fastify": "^4.26.2",
+    "@skein/schema": "workspace:*",
+    "@skein/engine": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.2",
+    "typescript": "^5.4.5",
+    "@types/node": "^20.12.7"
+  }
+}

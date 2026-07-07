@@ -1,0 +1,18 @@
+{
+  "name": "skein-monorepo",
+  "private": true,
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,css}\""
+  },
+  "devDependencies": {
+    "turbo": "^2.0.4",
+    "typescript": "^5.4.5",
+    "vitest": "^1.6.0",
+    "prettier": "^3.2.5"
+  },
+  "packageManager": "pnpm@8.15.3"
+}
