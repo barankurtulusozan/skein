@@ -148,6 +148,12 @@ function WorkflowCanvas() {
 }
 
 export default function App() {
+  const initializeWebSocket = useWorkflowStore((state) => state.initializeWebSocket);
+
+  useEffect(() => {
+    initializeWebSocket();
+  }, [initializeWebSocket]);
+
   return (
     <div className="flex flex-col w-screen h-screen overflow-hidden bg-background text-text-primary font-sans">
       <ReactFlowProvider>

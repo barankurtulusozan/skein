@@ -75,6 +75,7 @@ interface WorkflowState {
   loadWorkflow: (id: string) => Promise<void>;
   runWorkflow: (payload?: any) => Promise<void>;
   createNewWorkflow: () => void;
+  initializeWebSocket: () => void;
 }
 
 const serializeState = (nodes: Node[], edges: Edge[]) => {
@@ -145,6 +146,8 @@ const saveFlow = (nodes: Node[], edges: Edge[]) => {
     console.error("Failed to save workflow to localStorage", e);
   }
 };
+let socket: WebSocket | null = null;
+let reconnectTimeout: any = null;
 
 export const useWorkflowStore = create<WorkflowState>((set, get) => {
   const initialFlow = getSavedFlow();
@@ -520,21 +523,43 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => {
         const { runId } = await res.json();
 
         get().showToast(`Execution run started (ID: ${runId})`, "success");
+      } catch (err: any) {
+        get().showToast(err.message || "Trigger error", "error");
+      }
+    },
 
-        // Subscribe to live run streams via WebSockets
-        const ws = new WebSocket(WS_BASE);
+    initializeWebSocket: () => {
+      if (socket) return; // Already initialized
 
-        ws.onopen = () => {
+      const connect = () => {
+        console.log("[WebSocket]: Connecting to streaming endpoint...");
+        socket = new WebSocket(WS_BASE);
+
+        socket.onopen = () => {
           console.log("[WebSocket]: Connected to streaming endpoint");
         };
 
-        ws.onmessage = (event) => {
+        socket.onmessage = (event) => {
           const data = JSON.parse(event.data);
-          if (data.runId !== runId) return;
+          const { activeWorkflowId, nodes } = get();
+
+          // Only process events related to the active workflow on the canvas
+          if (data.workflowId !== activeWorkflowId) return;
 
           const { event: wsEvent, nodeId, output, error } = data;
 
-          if (wsEvent === "node:start") {
+          if (wsEvent === "run:start") {
+            const initialStatus: Record<string, any> = {};
+            nodes.forEach((n) => {
+              initialStatus[n.id] = "idle";
+            });
+            set({
+              nodeRunStatus: initialStatus,
+              nodeRunOutput: {},
+              nodeRunError: {},
+            });
+            get().showToast("Workflow run started...", "success");
+          } else if (wsEvent === "node:start") {
             set((state) => ({
               nodeRunStatus: { ...state.nodeRunStatus, [nodeId]: "running" },
             }));
@@ -553,7 +578,6 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => {
               nodeRunError: { ...state.nodeRunError, [nodeId]: error },
             }));
           } else if (wsEvent === "run:complete" || wsEvent === "run:error") {
-            ws.close();
             get().showToast(
               wsEvent === "run:complete"
                 ? "Workflow run completed!"
@@ -563,12 +587,20 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => {
           }
         };
 
-        ws.onerror = (err) => {
-          console.error("[WebSocket] Error:", err);
+        socket.onclose = () => {
+          console.log("[WebSocket]: Disconnected. Reconnecting in 3s...");
+          socket = null;
+          clearTimeout(reconnectTimeout);
+          reconnectTimeout = setTimeout(connect, 3000);
         };
-      } catch (err: any) {
-        get().showToast(err.message || "Trigger error", "error");
-      }
+
+        socket.onerror = (err) => {
+          console.error("[WebSocket] Error:", err);
+          socket?.close();
+        };
+      };
+
+      connect();
     },
 
     createNewWorkflow: () => {

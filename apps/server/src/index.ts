@@ -84,7 +84,7 @@ async function triggerWorkflowExecution(
       startedAt: Date.now(),
     };
     await db.saveRun(activeRun);
-    broadcast({ event: "node:start", runId, nodeId });
+    broadcast({ event: "node:start", runId, workflowId: workflow.id, nodeId });
   });
 
   executor.on("node:success", async (nodeId, output) => {
@@ -97,7 +97,7 @@ async function triggerWorkflowExecution(
       finishedAt: Date.now(),
     };
     await db.saveRun(activeRun);
-    broadcast({ event: "node:success", runId, nodeId, output });
+    broadcast({ event: "node:success", runId, workflowId: workflow.id, nodeId, output });
   });
 
   executor.on("node:skipped", async (nodeId) => {
@@ -109,7 +109,7 @@ async function triggerWorkflowExecution(
       finishedAt: Date.now(),
     };
     await db.saveRun(activeRun);
-    broadcast({ event: "node:skipped", runId, nodeId });
+    broadcast({ event: "node:skipped", runId, workflowId: workflow.id, nodeId });
   });
 
   executor.on("node:error", async (nodeId, error) => {
@@ -122,7 +122,7 @@ async function triggerWorkflowExecution(
       finishedAt: Date.now(),
     };
     await db.saveRun(activeRun);
-    broadcast({ event: "node:error", runId, nodeId, error });
+    broadcast({ event: "node:error", runId, workflowId: workflow.id, nodeId, error });
   });
 
   // Handle final completion
@@ -130,14 +130,14 @@ async function triggerWorkflowExecution(
     activeRun.status = "success";
     activeRun.finishedAt = Date.now();
     await db.saveRun(activeRun);
-    broadcast({ event: "run:complete", runId, results });
+    broadcast({ event: "run:complete", runId, workflowId: workflow.id, results });
   });
 
   executor.on("run:error", async (error) => {
     activeRun.status = "error";
     activeRun.finishedAt = Date.now();
     await db.saveRun(activeRun);
-    broadcast({ event: "run:error", runId, error });
+    broadcast({ event: "run:error", runId, workflowId: workflow.id, error });
   });
 
   // Run execution in the background asynchronously
