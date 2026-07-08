@@ -10,13 +10,15 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "fastify": "^4.26.2",
+    "@fastify/cors": "^11.2.0",
+    "@fastify/websocket": "^11.2.0",
+    "@skein/engine": "workspace:*",
     "@skein/schema": "workspace:*",
-    "@skein/engine": "workspace:*"
+    "fastify": "^4.26.2"
   },
   "devDependencies": {
+    "@types/node": "^20.12.7",
     "tsx": "^4.7.2",
-    "typescript": "^5.4.5",
-    "@types/node": "^20.12.7"
+    "typescript": "^5.4.5"
   }
 }

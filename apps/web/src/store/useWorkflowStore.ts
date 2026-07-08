@@ -11,10 +11,22 @@ import {
 } from "@xyflow/react";
 import { NODE_DEFINITIONS } from "../constants/nodeDefinitions";
 
+const API_BASE = "http://localhost:3001/api";
+const WS_BASE = "ws://localhost:3001/ws";
+
 export interface ToastState {
   message: string;
   type: "success" | "error" | "warning";
   id: number;
+}
+
+export interface DbWorkflow {
+  id: string;
+  name: string;
+  nodes: Node[];
+  edges: Edge[];
+  createdAt?: number;
+  updatedAt?: number;
 }
 
 interface WorkflowState {
@@ -23,6 +35,18 @@ interface WorkflowState {
   past: { nodes: Node[]; edges: Edge[] }[];
   future: { nodes: Node[]; edges: Edge[] }[];
   toasts: ToastState[];
+
+  // Backend Integration
+  workflowsList: DbWorkflow[];
+  isLoading: boolean;
+  activeWorkflowId: string | null;
+  activeWorkflowName: string;
+  nodeRunStatus: Record<
+    string,
+    "idle" | "running" | "success" | "error" | "skipped"
+  >;
+  nodeRunOutput: Record<string, any>;
+  nodeRunError: Record<string, string>;
 
   // React Flow handlers
   onNodesChange: OnNodesChange;
@@ -44,9 +68,15 @@ interface WorkflowState {
   // Toasts
   showToast: (message: string, type: "success" | "error" | "warning") => void;
   removeToast: (id: number) => void;
+
+  // Backend Actions
+  fetchWorkflows: () => Promise<void>;
+  saveWorkflow: (name?: string) => Promise<void>;
+  loadWorkflow: (id: string) => Promise<void>;
+  runWorkflow: (payload?: any) => Promise<void>;
+  createNewWorkflow: () => void;
 }
 
-// Helper to check if two states are identical (simple check for node/edge counts & structure)
 const serializeState = (nodes: Node[], edges: Edge[]) => {
   return JSON.stringify({
     nodes: nodes.map((n) => ({
@@ -66,6 +96,8 @@ const serializeState = (nodes: Node[], edges: Edge[]) => {
 };
 
 const DEFAULT_FLOW = {
+  id: "default-workflow",
+  name: "Default Workflow",
   nodes: [
     {
       id: "node-trigger",
@@ -119,7 +151,6 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => {
 
   const pushToHistory = (newNodes: Node[], newEdges: Edge[]) => {
     const { past, nodes, edges } = get();
-    // Only push if there's an actual structural change
     if (serializeState(nodes, edges) === serializeState(newNodes, newEdges)) {
       return;
     }
@@ -142,6 +173,15 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => {
     future: [],
     toasts: [],
 
+    // Backend initial states
+    workflowsList: [],
+    isLoading: false,
+    activeWorkflowId: initialFlow.id || DEFAULT_FLOW.id,
+    activeWorkflowName: initialFlow.name || DEFAULT_FLOW.name,
+    nodeRunStatus: {},
+    nodeRunOutput: {},
+    nodeRunError: {},
+
     onNodesChange: (changes) => {
       const isRemoval = changes.some((c) => c.type === "remove");
       const oldNodes = get().nodes;
@@ -152,10 +192,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => {
       }
 
       set({ nodes: newNodes });
-
-      if (isRemoval) {
-        saveFlow(newNodes, get().edges);
-      }
+      saveFlow(newNodes, get().edges);
     },
 
     onEdgesChange: (changes) => {
@@ -174,9 +211,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => {
     onNodeDragStop: () => {
       const { nodes, edges } = get();
       saveFlow(nodes, edges);
-      // We also push the final node positions to the history stack
       set((state) => {
-        // Find if position differs from the last history item
         const lastHistory = state.past[state.past.length - 1];
         if (lastHistory) {
           const positionsChanged = state.nodes.some((node) => {
@@ -223,7 +258,6 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => {
 
       if (!sourcePort || !targetPort) return;
 
-      // Type compatibility check
       const sourceT = sourcePort.dataType;
       const targetT = targetPort.dataType;
 
@@ -246,7 +280,6 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => {
       const nodeDef = NODE_DEFINITIONS[type];
       if (!nodeDef) return;
 
-      // Populate default configs
       const defaultConfig: Record<string, any> = {};
       nodeDef.configFields.forEach((field) => {
         defaultConfig[field.name] = field.defaultValue;
@@ -305,7 +338,13 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => {
       if (nodes.length === 0 && edges.length === 0) return;
 
       pushToHistory([], []);
-      set({ nodes: [], edges: [] });
+      set({
+        nodes: [],
+        edges: [],
+        nodeRunStatus: {},
+        nodeRunOutput: {},
+        nodeRunError: {},
+      });
       saveFlow([], []);
     },
 
@@ -359,7 +398,6 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => {
         toasts: [...state.toasts, { message, type, id }],
       }));
 
-      // Auto-remove toast after 4 seconds
       setTimeout(() => {
         get().removeToast(id);
       }, 4000);
@@ -369,6 +407,193 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => {
       set((state) => ({
         toasts: state.toasts.filter((t) => t.id !== id),
       }));
+    },
+
+    // --- Backend API Actions ---
+
+    fetchWorkflows: async () => {
+      set({ isLoading: true });
+      try {
+        const res = await fetch(`${API_BASE}/workflows`);
+        if (!res.ok) throw new Error("Failed to load workflows list.");
+        const list = await res.json();
+        set({ workflowsList: list });
+      } catch (err: any) {
+        get().showToast(err.message || "API Server connection error", "error");
+      } finally {
+        set({ isLoading: false });
+      }
+    },
+
+    saveWorkflow: async (customName) => {
+      const { activeWorkflowId, activeWorkflowName, nodes, edges } = get();
+      const finalName = customName || activeWorkflowName;
+      set({ isLoading: true });
+      try {
+        const res = await fetch(`${API_BASE}/workflows`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: activeWorkflowId,
+            name: finalName,
+            nodes,
+            edges,
+          }),
+        });
+
+        if (!res.ok) throw new Error("Failed to save workflow.");
+        await res.json();
+
+        get().showToast(
+          `Workflow "${finalName}" saved successfully.`,
+          "success",
+        );
+        set({ activeWorkflowName: finalName });
+        saveFlow(nodes, edges);
+        await get().fetchWorkflows();
+      } catch (err: any) {
+        get().showToast(err.message || "Save error", "error");
+      } finally {
+        set({ isLoading: false });
+      }
+    },
+
+    loadWorkflow: async (id) => {
+      set({ isLoading: true });
+      try {
+        const res = await fetch(`${API_BASE}/workflows/${id}`);
+        if (!res.ok) throw new Error("Workflow details not found.");
+        const workflow = await res.json();
+
+        set({
+          activeWorkflowId: workflow.id,
+          activeWorkflowName: workflow.name,
+          nodes: workflow.nodes || [],
+          edges: workflow.edges || [],
+          nodeRunStatus: {},
+          nodeRunOutput: {},
+          nodeRunError: {},
+          past: [],
+          future: [],
+        });
+        saveFlow(workflow.nodes || [], workflow.edges || []);
+        get().showToast(`Loaded workflow: "${workflow.name}"`, "success");
+      } catch (err: any) {
+        get().showToast(err.message || "Load error", "error");
+      } finally {
+        set({ isLoading: false });
+      }
+    },
+
+    runWorkflow: async (payload) => {
+      const { activeWorkflowId, nodes } = get();
+      if (!activeWorkflowId) {
+        get().showToast(
+          "Workflow context missing. Try saving first.",
+          "warning",
+        );
+        return;
+      }
+
+      // Reset UI state statuses
+      const initialStatus: Record<string, any> = {};
+      nodes.forEach((n) => {
+        initialStatus[n.id] = "idle";
+      });
+      set({
+        nodeRunStatus: initialStatus,
+        nodeRunOutput: {},
+        nodeRunError: {},
+      });
+
+      try {
+        const res = await fetch(
+          `${API_BASE}/workflows/${activeWorkflowId}/run`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ payload }),
+          },
+        );
+
+        if (!res.ok) throw new Error("Run trigger request failed.");
+        const { runId } = await res.json();
+
+        get().showToast(`Execution run started (ID: ${runId})`, "success");
+
+        // Subscribe to live run streams via WebSockets
+        const ws = new WebSocket(WS_BASE);
+
+        ws.onopen = () => {
+          console.log("[WebSocket]: Connected to streaming endpoint");
+        };
+
+        ws.onmessage = (event) => {
+          const data = JSON.parse(event.data);
+          if (data.runId !== runId) return;
+
+          const { event: wsEvent, nodeId, output, error } = data;
+
+          if (wsEvent === "node:start") {
+            set((state) => ({
+              nodeRunStatus: { ...state.nodeRunStatus, [nodeId]: "running" },
+            }));
+          } else if (wsEvent === "node:success") {
+            set((state) => ({
+              nodeRunStatus: { ...state.nodeRunStatus, [nodeId]: "success" },
+              nodeRunOutput: { ...state.nodeRunOutput, [nodeId]: output },
+            }));
+          } else if (wsEvent === "node:skipped") {
+            set((state) => ({
+              nodeRunStatus: { ...state.nodeRunStatus, [nodeId]: "skipped" },
+            }));
+          } else if (wsEvent === "node:error") {
+            set((state) => ({
+              nodeRunStatus: { ...state.nodeRunStatus, [nodeId]: "error" },
+              nodeRunError: { ...state.nodeRunError, [nodeId]: error },
+            }));
+          } else if (wsEvent === "run:complete" || wsEvent === "run:error") {
+            ws.close();
+            get().showToast(
+              wsEvent === "run:complete"
+                ? "Workflow run completed!"
+                : `Workflow run aborted: ${error}`,
+              wsEvent === "run:complete" ? "success" : "error",
+            );
+          }
+        };
+
+        ws.onerror = (err) => {
+          console.error("[WebSocket] Error:", err);
+        };
+      } catch (err: any) {
+        get().showToast(err.message || "Trigger error", "error");
+      }
+    },
+
+    createNewWorkflow: () => {
+      const newId = `workflow-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const nodes = [
+        {
+          id: "node-trigger",
+          type: "manual-trigger",
+          position: { x: 100, y: 150 },
+          data: { config: { defaultPayload: '{\n  "message": "hello"\n}' } },
+        },
+      ];
+      set({
+        activeWorkflowId: newId,
+        activeWorkflowName: "New Workflow",
+        nodes,
+        edges: [],
+        nodeRunStatus: {},
+        nodeRunOutput: {},
+        nodeRunError: {},
+        past: [],
+        future: [],
+      });
+      saveFlow(nodes, []);
+      get().showToast("Created new workflow workspace", "success");
     },
   };
 });

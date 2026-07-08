@@ -28,6 +28,13 @@ export default function CustomNode({ id, type, selected, data }: NodeProps) {
   const updateNodeConfig = useWorkflowStore((state) => state.updateNodeConfig);
   const deleteNode = useWorkflowStore((state) => state.deleteNode);
 
+  // Live status subscriptions from Zustand store
+  const runStatus = useWorkflowStore(
+    (state) => state.nodeRunStatus[id] || "idle",
+  );
+  const runOutput = useWorkflowStore((state) => state.nodeRunOutput[id]);
+  const runError = useWorkflowStore((state) => state.nodeRunError[id]);
+
   if (!nodeDef) {
     return (
       <div className="p-4 bg-red-950/20 border border-error text-error rounded-lg">
@@ -65,13 +72,53 @@ export default function CustomNode({ id, type, selected, data }: NodeProps) {
     }
   };
 
+  // Live status classes
+  const getStatusBorderClass = () => {
+    if (runStatus === "running") {
+      return "border-running shadow-[0_0_15px_rgba(91,141,239,0.35)] animate-pulse";
+    }
+    if (runStatus === "success") {
+      return "border-success shadow-[0_0_15px_rgba(61,220,151,0.25)]";
+    }
+    if (runStatus === "error") {
+      return "border-error shadow-[0_0_15px_rgba(255,107,107,0.25)]";
+    }
+    if (runStatus === "skipped") {
+      return "border-outline opacity-40";
+    }
+    return selected
+      ? "border-primary ring-1 ring-primary/40"
+      : "border-outline hover:border-text-muted/40";
+  };
+
+  const getStatusBadge = () => {
+    switch (runStatus) {
+      case "running":
+        return (
+          <span className="text-[9px] font-bold text-running animate-pulse">
+            ● RUNNING
+          </span>
+        );
+      case "success":
+        return (
+          <span className="text-[9px] font-bold text-success">✓ SUCCESS</span>
+        );
+      case "error":
+        return <span className="text-[9px] font-bold text-error">⚠ ERROR</span>;
+      case "skipped":
+        return (
+          <span className="text-[9px] font-bold text-text-muted">
+            ◌ SKIPPED
+          </span>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <div
-      className={`min-w-[260px] max-w-[320px] bg-surface border rounded-xl shadow-2xl transition-all relative ${
-        selected
-          ? "border-primary ring-1 ring-primary/40"
-          : "border-outline hover:border-text-muted/40"
-      }`}
+      className={`min-w-[260px] max-w-[320px] bg-surface border rounded-xl shadow-2xl transition-all relative ${getStatusBorderClass()}`}
     >
       {/* Delete Button (visible when node is hovered or selected) */}
       <button
@@ -106,9 +153,12 @@ export default function CustomNode({ id, type, selected, data }: NodeProps) {
           >
             {category}
           </span>
-          <span className="text-[10px] font-mono text-text-muted">
-            ID: {id.split("-").pop()}
-          </span>
+          <div className="flex items-center gap-2">
+            {getStatusBadge()}
+            <span className="text-[10px] font-mono text-text-muted">
+              ID: {id.split("-").pop()}
+            </span>
+          </div>
         </div>
         <h3 className="font-sans text-sm font-bold text-text-primary mt-1">
           {label}
@@ -247,6 +297,28 @@ export default function CustomNode({ id, type, selected, data }: NodeProps) {
               )}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Node Inline Run Output */}
+      {runOutput !== undefined && (
+        <div className="p-3 border-t border-outline bg-background/40 font-mono text-[10px] text-text-muted rounded-b-xl max-h-[120px] overflow-y-auto custom-scrollbar break-all">
+          <div className="text-[9px] uppercase tracking-wider text-success/60 mb-1 font-bold">
+            Output
+          </div>
+          <pre className="whitespace-pre-wrap">
+            {JSON.stringify(runOutput, null, 2)}
+          </pre>
+        </div>
+      )}
+
+      {/* Node Inline Run Error */}
+      {runError !== undefined && (
+        <div className="p-3 border-t border-outline bg-red-950/20 font-mono text-[10px] text-error rounded-b-xl break-all">
+          <div className="text-[9px] uppercase tracking-wider text-error/60 mb-1 font-bold">
+            Error
+          </div>
+          <div>{runError}</div>
         </div>
       )}
     </div>

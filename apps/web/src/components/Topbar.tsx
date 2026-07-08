@@ -1,18 +1,39 @@
-import React, { useRef } from "react";
+import React, { useRef, useEffect } from "react";
 import { useWorkflowStore } from "../store/useWorkflowStore";
 
 export default function Topbar() {
-  const { past, future, undo, redo, clearCanvas, nodes, edges, showToast } =
-    useWorkflowStore();
+  const {
+    past,
+    future,
+    undo,
+    redo,
+    clearCanvas,
+    nodes,
+    edges,
+    showToast,
+    workflowsList,
+    activeWorkflowId,
+    activeWorkflowName,
+    fetchWorkflows,
+    saveWorkflow,
+    loadWorkflow,
+    runWorkflow,
+    createNewWorkflow,
+  } = useWorkflowStore();
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Load saved workflows list on mount
+  useEffect(() => {
+    fetchWorkflows();
+  }, [fetchWorkflows]);
 
   const handleExport = () => {
     try {
       const dataStr = JSON.stringify({ nodes, edges }, null, 2);
       const dataUri =
         "data:application/json;charset=utf-8," + encodeURIComponent(dataStr);
-
-      const exportFileDefaultName = `skein-workflow-${Date.now()}.json`;
+      const exportFileDefaultName = `${activeWorkflowName.toLowerCase().replace(/\s+/g, "-")}-${Date.now()}.json`;
 
       const linkElement = document.createElement("a");
       linkElement.setAttribute("href", dataUri);
@@ -38,17 +59,12 @@ export default function Topbar() {
         const content = e.target?.result as string;
         const parsed = JSON.parse(content);
         if (Array.isArray(parsed.nodes) && Array.isArray(parsed.edges)) {
-          // Update the store by clearing and pushing
           useWorkflowStore.setState({
             nodes: parsed.nodes,
             edges: parsed.edges,
             past: [],
             future: [],
           });
-          localStorage.setItem(
-            "skein-workflow",
-            JSON.stringify({ nodes: parsed.nodes, edges: parsed.edges }),
-          );
           showToast("Workflow JSON imported successfully", "success");
         } else {
           showToast("Invalid workflow JSON file structure", "error");
@@ -58,33 +74,61 @@ export default function Topbar() {
       }
     };
     reader.readAsText(file);
-    // Reset file input value
     event.target.value = "";
   };
 
   return (
     <header className="fixed top-0 left-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-background border-b border-outline">
-      {/* Brand Logo */}
-      <div className="flex items-center gap-3">
-        <svg
-          className="w-6 h-6 text-primary"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-        >
-          <path
-            d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+      {/* Brand Logo & Saved Workflows Selector */}
+      <div className="flex items-center gap-4">
+        <div className="flex items-center gap-2">
+          <svg
+            className="w-6 h-6 text-primary"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+          >
+            <path
+              d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+          <span className="font-sans text-xl font-bold tracking-tight text-primary">
+            Skein
+          </span>
+        </div>
+
+        {/* Workflow Switcher Dropdown */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-text-muted">Workflow:</span>
+          <select
+            value={activeWorkflowId || ""}
+            onChange={(e) => {
+              if (e.target.value) loadWorkflow(e.target.value);
+            }}
+            className="bg-surface border border-outline rounded px-2.5 py-1 text-xs text-text-primary focus:outline-none focus:border-primary font-sans max-w-[200px] cursor-pointer"
+          >
+            {workflowsList.map((w) => (
+              <option key={w.id} value={w.id}>
+                {w.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* Workflow Name Editor Input */}
+        <div className="flex items-center gap-2 border-l border-outline pl-4">
+          <input
+            type="text"
+            value={activeWorkflowName}
+            onChange={(e) =>
+              useWorkflowStore.setState({ activeWorkflowName: e.target.value })
+            }
+            placeholder="Workflow Name"
+            className="bg-transparent text-text-primary font-sans text-sm font-semibold border-b border-transparent hover:border-outline focus:border-primary px-1 focus:outline-none w-[180px] transition-colors"
           />
-        </svg>
-        <span className="font-sans text-xl font-bold tracking-tight text-primary">
-          Skein
-        </span>
-        <div className="flex items-center gap-1.5 bg-surface border border-outline px-2.5 py-0.5 rounded-full text-xs font-mono">
-          <span className="w-1.5 h-1.5 rounded-full bg-success"></span>
-          <span className="text-text-muted">LOCAL</span>
         </div>
       </div>
 
@@ -134,7 +178,7 @@ export default function Topbar() {
         </button>
       </div>
 
-      {/* Right Controls: Import/Export & Clear */}
+      {/* Right Controls: New, Save, Run, Import/Export & Clear */}
       <div className="flex items-center gap-3">
         <input
           type="file"
@@ -143,9 +187,24 @@ export default function Topbar() {
           onChange={handleImportFile}
           className="hidden"
         />
+
         <button
-          onClick={handleImportClick}
+          onClick={createNewWorkflow}
           className="px-3.5 py-2 text-sm font-semibold rounded-lg bg-surface border border-outline hover:border-text-muted text-text-primary transition-all flex items-center gap-1.5"
+        >
+          New
+        </button>
+
+        <button
+          onClick={() => saveWorkflow()}
+          className="px-3.5 py-2 text-sm font-semibold rounded-lg bg-primary hover:bg-primary/80 text-background transition-all flex items-center gap-1.5"
+        >
+          Save
+        </button>
+
+        <button
+          onClick={() => runWorkflow()}
+          className="px-3.5 py-2 text-sm font-semibold rounded-lg bg-success text-background hover:bg-success/80 transition-all flex items-center gap-1.5"
         >
           <svg
             className="w-4 h-4"
@@ -157,28 +216,22 @@ export default function Topbar() {
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
-              d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"
+              d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.348a1.125 1.125 0 010 1.971l-11.54 6.347a1.125 1.125 0 01-1.667-.985V5.653z"
             />
           </svg>
+          Run
+        </button>
+
+        <button
+          onClick={handleImportClick}
+          className="px-3.5 py-2 text-sm font-semibold rounded-lg bg-surface border border-outline hover:border-text-muted text-text-primary transition-all flex items-center gap-1.5"
+        >
           Import
         </button>
         <button
           onClick={handleExport}
           className="px-3.5 py-2 text-sm font-semibold rounded-lg bg-surface border border-outline hover:border-text-muted text-text-primary transition-all flex items-center gap-1.5"
         >
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            strokeWidth="2"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"
-            />
-          </svg>
           Export
         </button>
         <button
