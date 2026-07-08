@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  server:
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+    ports:
+      - '3001:3001'
+    volumes:
+      # Persist local database workflows and runs JSON files on host
+      - db-data:/app/apps/server/db
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    restart: always
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    ports:
+      - '3000:80'
+    depends_on:
+      - server
+    restart: always
+
+volumes:
+  db-data:
