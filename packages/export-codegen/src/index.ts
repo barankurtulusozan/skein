@@ -1,244 +1,79 @@
 import { Workflow } from "@skein/schema";
 
-// Helper templates containing stringified implementations of the built-in executors
-const EXECUTORS_MAP: Record<string, string> = {
-  "manual-trigger": `
-async function manualTriggerExecutor(config, inputs) {
-  return { payload: inputs.payload };
-}`,
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import { createRequire } from "module";
 
-  "webhook-trigger": `
-async function webhookTriggerExecutor(config, inputs) {
-  return { payload: inputs.payload };
-}`,
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-  "schedule-trigger": `
-async function scheduleTriggerExecutor(config, inputs) {
-  return { payload: inputs.payload };
-}`,
-
-  "http-request": `
-function templateString(template, context) {
-  return template.replace(/\\{\\{([^}]+)\\}\\}/g, (match, path) => {
-    const parts = path.trim().split('.');
-    let val = context;
-    for (const part of parts) {
-      if (val === null || val === undefined) return '';
-      val = val[part];
-    }
-    return val !== undefined ? String(val) : '';
-  });
-}
-
-async function httpRequestExecutor(config, inputs) {
-  const url = templateString(config.url || '', inputs);
-  const method = config.method || 'GET';
-  const headers = {};
-  if (config.headers) {
-    try {
-      const parsed = JSON.parse(config.headers);
-      Object.assign(headers, parsed);
-    } catch (e) {}
-  }
-  let body = undefined;
-  if (method !== 'GET' && method !== 'HEAD' && config.body) {
-    body = templateString(config.body, inputs);
-  }
-  const response = await fetch(url, { method, headers, body });
-  const text = await response.text();
-  let data;
-  try {
-    data = JSON.parse(text);
-  } catch (e) {
-    data = text;
-  }
-  if (!response.ok) {
-    throw new Error('HTTP request failed: ' + response.statusText);
-  }
-  return { response: data };
-}`,
-
-  delay: `
-async function delayExecutor(config, inputs) {
-  const seconds = Number(config.duration) || 5;
-  await new Promise((resolve) => setTimeout(resolve, seconds * 1000));
-  return { success: true };
-}`,
-
-  condition: `
-async function conditionExecutor(config, inputs) {
-  const value = inputs.value;
-  const expression = config.expression || 'input === true';
-  const evaluate = new Function('input', 'try { return ' + expression + '; } catch (e) { return false; }');
-  const isTrue = evaluate(value);
-  return isTrue ? { true: value } : { false: value };
-}`,
-
-  transform: `
-async function transformExecutor(config, inputs) {
-  const input = inputs.input;
-  const code = config.code || 'return input;';
-  const fn = new Function('input', code);
-  const output = fn(input);
-  return { output };
-}`,
-
-  "log-debug": `
-async function logDebugExecutor(config, inputs) {
-  const data = inputs.data;
-  console.log('[Skein Log/Debug]:', JSON.stringify(data, null, 2));
-  return { logged: true };
-}`,
-
-  "llm-prompt": `
-async function llmPromptExecutor(config, inputs, context) {
-  const provider = config.provider || 'OpenAI';
-  const model = config.model || 'gpt-4o';
-  let prompt = inputs.prompt;
-  if (prompt && typeof prompt === 'object') {
-    prompt = prompt.text || prompt.content || prompt.message || JSON.stringify(prompt);
-  }
-  if (!prompt) {
-    prompt = templateString(config.promptTemplate || 'Synthesize: {{input}}', inputs);
-  }
-  const systemInstruction = inputs.system || '';
-  let baseUrl = config.baseUrl;
-  if (!baseUrl) {
-    baseUrl = provider === 'Local/Ollama' ? 'http://127.0.0.1:11434/v1' : 'https://api.openai.com/v1';
-  }
-  const apiKey = config.apiKey || process.env.OPENAI_API_KEY || 'mock-key';
-  const messages = [];
-  if (systemInstruction) {
-    messages.push({ role: 'system', content: systemInstruction });
-  }
-  messages.push({ role: 'user', content: prompt });
-
-  const workflow = context?.workflow;
-  const executors = context?.executors;
-  const currentId = context?.nodeId;
-  const tools = [];
-  const toolMappings = {};
-  
-  if (workflow && currentId && executors) {
-    const outgoingEdges = workflow.edges.filter((e) => e.source === currentId);
-    outgoingEdges.forEach((edge) => {
-      const targetNode = workflow.nodes.find((n) => n.id === edge.target);
-      if (targetNode && targetNode.type === 'tool-call') {
-        const toolName = targetNode.config?.toolName || 'my_tool';
-        tools.push({
-          type: 'function',
-          function: {
-            name: toolName,
-            description: targetNode.description || 'Custom workflow tool call',
-            parameters: {
-              type: 'object',
-              properties: {
-                args: { type: 'object', description: 'Arguments' }
-              }
-            }
-          }
-        });
-        toolMappings[toolName] = targetNode;
-      }
-    });
-  }
-
-  const callCompletions = async (messagesList) => {
-    if (apiKey === 'mock-key' || process.env.VITEST) {
-      if (tools.length > 0 && messagesList.length === 1 + (systemInstruction ? 1 : 0)) {
-        return {
-          choices: [{
-            message: {
-              role: 'assistant',
-              tool_calls: [{
-                id: 'call_123',
-                type: 'function',
-                function: {
-                  name: tools[0].function.name,
-                  arguments: JSON.stringify({ args: { value: 'mock_tool_input' } })
-                }
-              }]
-            }
-          }]
-        };
-      }
-      const toolResponse = messagesList.find((m) => m.role === 'tool');
-      const suffix = toolResponse ? ' (with tool result: ' + toolResponse.content + ')' : '';
-      return {
-        choices: [{
-          message: {
-            role: 'assistant',
-            content: '[Mock LLM Response for: "' + prompt + '"]' + suffix
-          }
-        }]
-      };
-    }
-    const payload = { model, messages: messagesList };
-    if (tools.length > 0) {
-      payload.tools = tools;
-    }
-    const response = await fetch(baseUrl + '/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + apiKey
-      },
-      body: JSON.stringify(payload)
-    });
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error('LLM completions call failed: ' + errText);
-    }
-    return await response.json();
-  };
-
-  let completionResult = await callCompletions(messages);
-  let messageOut = completionResult.choices?.[0]?.message;
-
-  if (messageOut?.tool_calls && messageOut.tool_calls.length > 0) {
-    const toolCall = messageOut.tool_calls[0];
-    const toolName = toolCall.function.name;
-    const toolNode = toolMappings[toolName];
-    if (toolNode && executors) {
-      let args = {};
-      try {
-        const parsed = JSON.parse(toolCall.function.arguments);
-        args = parsed.args || parsed;
-      } catch (e) {}
-      const executeSubpath = async (nodeId, currentInputs) => {
-        const node = workflow.nodes.find((n) => n.id === nodeId);
-        if (!node) return currentInputs;
-        const executor = executors[node.type];
-        if (!executor) return currentInputs;
-        const outputs = await executor(node.config || {}, currentInputs, context);
-        const outEdges = workflow.edges.filter((e) => e.source === nodeId);
-        if (outEdges.length === 0) {
-          return Object.values(outputs)[0] ?? outputs;
-        }
-        const nextEdge = outEdges[0];
-        const nextInputs = { [nextEdge.targetHandle]: Object.values(outputs)[0] };
-        return executeSubpath(nextEdge.target, nextInputs);
-      };
-      const toolResultOutput = await executeSubpath(toolNode.id, { args });
-      messages.push(messageOut);
-      messages.push({
-        role: 'tool',
-        tool_call_id: toolCall.id,
-        name: toolName,
-        content: typeof toolResultOutput === 'string' ? toolResultOutput : JSON.stringify(toolResultOutput)
-      });
-      completionResult = await callCompletions(messages);
-      messageOut = completionResult.choices?.[0]?.message;
-    }
-  }
-  return { response: messageOut?.content || '' };
-}`,
-
-  "tool-call": `
-async function toolCallExecutor(config, inputs) {
-  return { result: inputs.args ?? {} };
-}`,
+const TYPE_TO_FILE: Record<string, string> = {
+  "manual-trigger": "manualTrigger",
+  "webhook-trigger": "webhookTrigger",
+  "schedule-trigger": "scheduleTrigger",
+  "http-request": "httpRequest",
+  delay: "delay",
+  condition: "condition",
+  loop: "stubs",
+  transform: "transform",
+  "llm-prompt": "llmPrompt",
+  "tool-call": "toolCall",
+  "log-debug": "logDebug",
 };
+
+function getExecutorSource(nodeType: string): string {
+  const fileName = TYPE_TO_FILE[nodeType];
+  if (!fileName) {
+    throw new Error(`Unsupported node type for standalone export: ${nodeType}`);
+  }
+
+  const nodesDir = path.resolve(__dirname, "../../nodes");
+  const tsPath = path.join(nodesDir, "src/executors", `${fileName}.ts`);
+  const jsPath = path.join(nodesDir, "dist/executors", `${fileName}.js`);
+
+  let code = "";
+
+  if (fs.existsSync(tsPath)) {
+    const tsCode = fs.readFileSync(tsPath, "utf8");
+    try {
+      const require = createRequire(import.meta.url);
+      const ts = require("typescript");
+      code = ts.transpileModule(tsCode, {
+        compilerOptions: {
+          target: ts.ScriptTarget.ES2022,
+          module: ts.ModuleKind.ESNext,
+          removeComments: false,
+        },
+      }).outputText;
+    } catch (e) {
+      if (fs.existsSync(jsPath)) {
+        code = fs.readFileSync(jsPath, "utf8");
+      } else {
+        throw new Error(
+          `Cannot transpile ${tsPath} because typescript package is not available and compiled JS at ${jsPath} does not exist.`,
+        );
+      }
+    }
+  } else if (fs.existsSync(jsPath)) {
+    code = fs.readFileSync(jsPath, "utf8");
+  } else {
+    throw new Error(`Executor implementation not found for node type: ${nodeType} (searched in ${tsPath} and ${jsPath})`);
+  }
+
+  // Clean imports
+  code = code.replace(/import\s+[\s\S]*?\s+from\s+['"].*?['"];?/g, "");
+
+  // Clean exports
+  code = code.replace(/\bexport\s+async\s+function\s+/g, "async function ");
+  code = code.replace(/\bexport\s+function\s+/g, "function ");
+  code = code.replace(/\bexport\s+const\s+/g, "const ");
+
+  // Clean source map URLs
+  code = code.replace(/\/\/# sourceMappingURL=.*$/gm, "");
+
+  return code.trim();
+}
 
 export function generateStandaloneCode(workflow: Workflow): string {
   // 1. Gather all node types present in the workflow
@@ -247,11 +82,11 @@ export function generateStandaloneCode(workflow: Workflow): string {
     if (node.type) activeTypes.add(node.type);
   });
 
-  // 2. Generate the executor registration map string
+  // 2. Generate the executor registration map string dynamically
   const executorImportsCode = Array.from(activeTypes)
-    .map((type) => EXECUTORS_MAP[type] || "")
+    .map((type) => getExecutorSource(type))
     .filter(Boolean)
-    .join("\n");
+    .join("\n\n");
 
   const registryMapping = Array.from(activeTypes)
     .map((type) => {
@@ -261,9 +96,34 @@ export function generateStandaloneCode(workflow: Workflow): string {
     })
     .join("\n");
 
+  const requiresVm = activeTypes.has("condition") || activeTypes.has("transform");
+  const vmImport = requiresVm ? 'import vm from "node:vm";\n' : '';
+
+  const needsTemplateString = activeTypes.has("http-request") || activeTypes.has("llm-prompt");
+  const includesHttpRequest = activeTypes.has("http-request");
+  let templateStringHelper = "";
+  if (needsTemplateString && !includesHttpRequest) {
+    templateStringHelper = `
+function templateString(str, variables) {
+  return str.replace(/\\{\\{([^}]+)\\}\\}/g, (_, path) => {
+    const keys = path.trim().split(".");
+    let val = variables;
+    for (const key of keys) {
+      if (val === null || val === undefined) return "";
+      val = val[key];
+    }
+    return val !== undefined ? String(val) : "";
+  });
+}
+`;
+  }
+
   return `// 🧶 Standalone workflow execution code generated by Skein
 // Workflow Name: ${workflow.name}
 // Generated At: ${new Date().toISOString()}
+
+${vmImport}
+${templateStringHelper}
 
 const workflow = ${JSON.stringify(workflow, null, 2)};
 
