@@ -49,12 +49,14 @@ graph TD
 ## 🚀 Quick Start
 
 ### Prerequisites
+
 - [Node.js](https://nodejs.org/) v20+
 - [pnpm](https://pnpm.io/) v8+
 
 ### Setup & Installation
 
 Clone and install dependencies:
+
 ```bash
 # Install and link workspace dependencies
 pnpm install
@@ -66,6 +68,7 @@ pnpm build
 ### Run the Development Environments
 
 Start both the frontend Vite canvas and Fastify server concurrently:
+
 ```bash
 # Boots web (port 5173) and server (port 3001)
 pnpm dev
@@ -82,11 +85,13 @@ pnpm dev
 Skein exposes simple REST APIs to manage and trigger workflows:
 
 ### Workflows REST endpoints:
+
 - `GET /api/workflows` - List saved workflows.
 - `POST /api/workflows` - Create/update a workflow schema.
 - `GET /api/workflows/:id/runs` - Retrieve run history.
 
 ### Manually trigger execution:
+
 ```bash
 curl -X POST http://localhost:3001/api/workflows/:id/run \
   -H "Content-Type: application/json" \
@@ -94,7 +99,9 @@ curl -X POST http://localhost:3001/api/workflows/:id/run \
 ```
 
 ### Triggering via webhook:
+
 If a workflow starts with a `webhook-trigger` node, it exposes a dedicated webhook entrypoint:
+
 ```bash
 curl -X POST http://localhost:3001/api/webhooks/:workflowId \
   -H "Content-Type: application/json" \
@@ -120,5 +127,6 @@ npx playwright test
 ## 💡 Production Scaling (Upgrades)
 
 To maintain a zero-config onboarding workflow, Skein ships with embedded implementations:
-- **Persistence (`apps/server/src/db.ts`)**: Uses file-backed JSON directories. *Upgrade Path:* Swap out with PostgreSQL / SQLite and Prisma Client.
-- **Queueing & Scheduling (`apps/server/src/scheduler.ts`)**: Uses in-memory interval loops. *Upgrade Path:* Swap out with Redis and BullMQ.
+
+- **Persistence (`apps/server/src/db.ts`)**: Uses file-backed JSON directories. _Upgrade Path:_ Swap out with PostgreSQL / SQLite and Prisma Client.
+- **Queueing & Scheduling (`apps/server/src/scheduler.ts`)**: Uses in-memory interval loops. _Upgrade Path:_ Swap out with Redis and BullMQ.

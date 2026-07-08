@@ -6,11 +6,9 @@ import { delayExecutor } from "./executors/delay";
 import { conditionExecutor } from "./executors/condition";
 import { transformExecutor } from "./executors/transform";
 import { logDebugExecutor } from "./executors/logDebug";
-import {
-  loopExecutor,
-  llmPromptExecutor,
-  toolCallExecutor,
-} from "./executors/stubs";
+import { loopExecutor } from "./executors/stubs";
+import { llmPromptExecutor } from "./executors/llmPrompt";
+import { toolCallExecutor } from "./executors/toolCall";
 
 export type NodeExecutor = (
   config: Record<string, any>,
@@ -41,3 +39,5 @@ export * from "./executors/condition";
 export * from "./executors/transform";
 export * from "./executors/logDebug";
 export * from "./executors/stubs";
+export * from "./executors/llmPrompt";
+export * from "./executors/toolCall";

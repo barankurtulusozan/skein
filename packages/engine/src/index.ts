@@ -10,11 +10,13 @@ import { EventEmitter } from "./eventEmitter";
 
 export class WorkflowExecutor extends EventEmitter {
   private workflow: Workflow;
+  private customExecutors: Record<string, any>;
   private results: Record<string, NodeRunResult> = {};
 
-  constructor(workflow: Workflow) {
+  constructor(workflow: Workflow, customExecutors: Record<string, any> = {}) {
     super();
     this.workflow = workflow;
+    this.customExecutors = customExecutors;
   }
 
   async execute(
@@ -110,12 +112,20 @@ export class WorkflowExecutor extends EventEmitter {
         this.emit("node:start", nodeId);
 
         try {
-          const executor = NODE_EXECUTORS[node.type];
+          const activeExecutors = {
+            ...NODE_EXECUTORS,
+            ...this.customExecutors,
+          };
+          const executor = activeExecutors[node.type];
           if (!executor) {
             throw new Error(`No executor found for node type: "${node.type}"`);
           }
 
-          const output = await executor(node.config || {}, inputs);
+          const output = await executor(node.config || {}, inputs, {
+            workflow: this.workflow,
+            executors: activeExecutors,
+            nodeId,
+          });
 
           this.results[nodeId] = {
             nodeId,
