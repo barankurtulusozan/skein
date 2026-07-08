@@ -2,6 +2,7 @@ import Fastify from "fastify";
 import cors from "@fastify/cors";
 import websocket from "@fastify/websocket";
 import { WorkflowExecutor } from "@skein/engine";
+import { generateStandaloneCode } from "@skein/export-codegen";
 import { db, DbWorkflow, DbRun } from "./db";
 import { scheduler } from "./scheduler";
 import { randomUUID } from "crypto";
@@ -210,6 +211,20 @@ fastify.post("/api/workflows/:id/run", async (request, reply) => {
   const runId = await triggerWorkflowExecution(workflow, payload);
 
   return { runId, status: "started" };
+});
+
+// Export workflow as standalone typescript code
+fastify.get("/api/workflows/:id/export", async (request, reply) => {
+  const { id } = request.params as { id: string };
+  const workflow = await db.getWorkflow(id);
+  if (!workflow) {
+    reply.status(404);
+    return { error: "Workflow not found" };
+  }
+
+  const code = generateStandaloneCode(workflow);
+  reply.header("Content-Type", "text/plain; charset=utf-8");
+  return code;
 });
 
 // Webhook trigger endpoint

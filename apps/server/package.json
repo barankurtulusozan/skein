@@ -13,6 +13,7 @@
     "@fastify/cors": "^11.2.0",
     "@fastify/websocket": "^11.2.0",
     "@skein/engine": "workspace:*",
+    "@skein/export-codegen": "workspace:*",
     "@skein/schema": "workspace:*",
     "fastify": "^4.26.2"
   },

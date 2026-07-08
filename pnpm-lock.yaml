@@ -35,6 +35,9 @@ importers:
       '@skein/engine':
         specifier: workspace:*
         version: link:../../packages/engine
+      '@skein/export-codegen':
+        specifier: workspace:*
+        version: link:../../packages/export-codegen
       '@skein/schema':
         specifier: workspace:*
         version: link:../../packages/schema
@@ -103,6 +106,16 @@ importers:
       '@skein/nodes':
         specifier: workspace:*
         version: link:../nodes
+      '@skein/schema':
+        specifier: workspace:*
+        version: link:../schema
+    devDependencies:
+      typescript:
+        specifier: ^5.4.5
+        version: 5.9.3
+
+  packages/export-codegen:
+    dependencies:
       '@skein/schema':
         specifier: workspace:*
         version: link:../schema

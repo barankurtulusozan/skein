@@ -45,6 +45,32 @@ export default function Topbar() {
     }
   };
 
+  const handleExportCode = async () => {
+    if (!activeWorkflowId) {
+      showToast("Save the workflow first before exporting code.", "warning");
+      return;
+    }
+    try {
+      const res = await fetch(
+        `http://localhost:3001/api/workflows/${activeWorkflowId}/export`,
+      );
+      if (!res.ok) throw new Error("Failed to export standalone code.");
+      const code = await res.text();
+
+      const dataUri =
+        "data:text/plain;charset=utf-8," + encodeURIComponent(code);
+      const exportFileDefaultName = `${activeWorkflowName.toLowerCase().replace(/\s+/g, "-")}-standalone.ts`;
+
+      const linkElement = document.createElement("a");
+      linkElement.setAttribute("href", dataUri);
+      linkElement.setAttribute("download", exportFileDefaultName);
+      linkElement.click();
+      showToast("Workflow standalone TS code exported successfully", "success");
+    } catch (err: any) {
+      showToast(err.message || "Failed to export code", "error");
+    }
+  };
+
   const handleImportClick = () => {
     fileInputRef.current?.click();
   };
@@ -233,6 +259,12 @@ export default function Topbar() {
           className="px-3.5 py-2 text-sm font-semibold rounded-lg bg-surface border border-outline hover:border-text-muted text-text-primary transition-all flex items-center gap-1.5"
         >
           Export
+        </button>
+        <button
+          onClick={handleExportCode}
+          className="px-3.5 py-2 text-sm font-semibold rounded-lg bg-surface border border-outline hover:border-text-muted text-text-primary transition-all flex items-center gap-1.5"
+        >
+          Export Code
         </button>
         <button
           onClick={clearCanvas}
