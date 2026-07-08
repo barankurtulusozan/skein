@@ -59,6 +59,17 @@ export class WorkflowExecutor extends EventEmitter {
     let runErrorOccurred: any = null;
 
     const executeNode = async (nodeId: string): Promise<void> => {
+      // Visited guard to prevent double-execution of nodes already run by tool paths
+      if (
+        this.results[nodeId] &&
+        (this.results[nodeId].status === "success" ||
+          this.results[nodeId].status === "running" ||
+          this.results[nodeId].status === "error" ||
+          this.results[nodeId].status === "skipped")
+      ) {
+        return;
+      }
+
       const node = this.workflow.nodes.find((n) => n.id === nodeId)!;
       const edges = incomingEdges[nodeId];
 
@@ -125,6 +136,7 @@ export class WorkflowExecutor extends EventEmitter {
             workflow: this.workflow,
             executors: activeExecutors,
             nodeId,
+            executor: this,
           });
 
           this.results[nodeId] = {
@@ -196,6 +208,80 @@ export class WorkflowExecutor extends EventEmitter {
 
     this.emit("run:complete", this.results);
     return this.results;
+  }
+
+  async executeToolSubpath(
+    startNodeId: string,
+    initialInputs: Record<string, any>,
+  ): Promise<any> {
+    let currentNodeId: string | undefined = startNodeId;
+    let currentInputs = initialInputs;
+
+    while (currentNodeId) {
+      const node = this.workflow.nodes.find((n) => n.id === currentNodeId);
+      if (!node) break;
+
+      this.results[node.id] = {
+        nodeId: node.id,
+        status: "running",
+        startedAt: Date.now(),
+      };
+      this.emit("node:start", node.id);
+
+      try {
+        const activeExecutors = {
+          ...NODE_EXECUTORS,
+          ...this.customExecutors,
+        };
+        const executor = activeExecutors[node.type];
+        if (!executor) {
+          throw new Error(`No executor found for node type: "${node.type}"`);
+        }
+
+        const outputs = await executor(node.config || {}, currentInputs, {
+          workflow: this.workflow,
+          executors: activeExecutors,
+          nodeId: node.id,
+          executor: this,
+        });
+
+        this.results[node.id] = {
+          nodeId: node.id,
+          status: "success",
+          output: outputs,
+          startedAt: this.results[node.id].startedAt,
+          finishedAt: Date.now(),
+        };
+        this.emit("node:success", node.id, outputs);
+
+        // Find next edge in the subpath
+        const outEdges = this.workflow.edges.filter(
+          (e) => e.source === currentNodeId,
+        );
+        if (outEdges.length === 0) {
+          return Object.values(outputs)[0] ?? outputs;
+        }
+
+        const nextEdge = outEdges[0];
+        currentNodeId = nextEdge.target;
+        currentInputs = {
+          [nextEdge.targetHandle]: Object.values(outputs)[0],
+        };
+      } catch (err: any) {
+        const errMsg = err.message || String(err);
+        this.results[node.id] = {
+          nodeId: node.id,
+          status: "error",
+          error: errMsg,
+          startedAt: this.results[node.id].startedAt,
+          finishedAt: Date.now(),
+        };
+        this.emit("node:error", node.id, errMsg);
+        throw err;
+      }
+    }
+
+    return currentInputs;
   }
 }
 

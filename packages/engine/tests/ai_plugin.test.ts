@@ -80,11 +80,20 @@ describe("AI & Plugin Custom Executors", () => {
       ],
     };
 
-    const executor = new WorkflowExecutor(workflow);
+    let toolExecutionCount = 0;
+    const customToolExecutor = async (config: any, inputs: any) => {
+      toolExecutionCount++;
+      return { result: inputs.args ?? {} };
+    };
+
+    const executor = new WorkflowExecutor(workflow, {
+      "tool-call": customToolExecutor,
+    });
     const results = await executor.execute();
 
     expect(results["prompt-node"].status).toBe("success");
     expect(results["tool-node"].status).toBe("success");
+    expect(toolExecutionCount).toBe(1);
     expect(results["prompt-node"].output?.response).toContain(
       'with tool result: {"value":"mock_tool_input"}',
     );

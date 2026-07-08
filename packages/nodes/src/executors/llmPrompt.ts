@@ -171,39 +171,17 @@ export async function llmPromptExecutor(
         args = parsed.args || parsed;
       } catch (e) {}
 
-      // Helper to recursively execute downstream tool subpath
-      const executeSubpath = async (
-        nodeId: string,
-        currentInputs: any,
-      ): Promise<any> => {
-        const node = workflow.nodes.find((n: any) => n.id === nodeId);
-        if (!node) return currentInputs;
-
-        const executor = executors[node.type];
-        if (!executor) return currentInputs;
-
-        const outputs = await executor(
-          node.config || {},
-          currentInputs,
-          context,
-        );
-
-        // Find next edges in subpath
-        const outEdges = workflow.edges.filter((e: any) => e.source === nodeId);
-        if (outEdges.length === 0) {
-          return Object.values(outputs)[0] ?? outputs;
-        }
-
-        const nextEdge = outEdges[0];
-        const nextInputs = {
-          [nextEdge.targetHandle]: Object.values(outputs)[0],
-        };
-        return executeSubpath(nextEdge.target, nextInputs);
-      };
-
-      // Trigger the tool subpath
+      // Trigger the tool subpath using the workflow executor
       console.log(`[LLM Prompt]: Executing tool subpath for "${toolName}"`);
-      const toolResultOutput = await executeSubpath(toolNode.id, { args });
+      if (!context?.executor?.executeToolSubpath) {
+        throw new Error(
+          "WorkflowExecutor or executeToolSubpath is missing in context.",
+        );
+      }
+      const toolResultOutput = await context.executor.executeToolSubpath(
+        toolNode.id,
+        { args },
+      );
 
       // Add messages to list to submit back to model
       messages.push(messageOut);

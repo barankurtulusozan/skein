@@ -167,6 +167,17 @@ class StandaloneWorkflowExecutor {
     let runErrorOccurred = null;
 
     const executeNode = async (nodeId) => {
+      // Visited guard to prevent double-execution of nodes already run by tool paths
+      if (
+        this.results[nodeId] &&
+        (this.results[nodeId].status === 'success' ||
+          this.results[nodeId].status === 'running' ||
+          this.results[nodeId].status === 'error' ||
+          this.results[nodeId].status === 'skipped')
+      ) {
+        return;
+      }
+
       const node = this.workflow.nodes.find((n) => n.id === nodeId);
       const edges = incomingEdges[nodeId];
       let inputs = {};
@@ -218,6 +229,7 @@ class StandaloneWorkflowExecutor {
             workflow: this.workflow,
             executors: EXECUTORS,
             nodeId,
+            executor: this,
           });
 
           this.results[nodeId] = {
@@ -280,6 +292,67 @@ class StandaloneWorkflowExecutor {
     }
 
     return this.results;
+  }
+
+  async executeToolSubpath(startNodeId, initialInputs) {
+    let currentNodeId = startNodeId;
+    let currentInputs = initialInputs;
+
+    while (currentNodeId) {
+      const node = this.workflow.nodes.find((n) => n.id === currentNodeId);
+      if (!node) break;
+
+      this.results[node.id] = {
+        nodeId: node.id,
+        status: 'running',
+        startedAt: Date.now(),
+      };
+
+      try {
+        const executor = EXECUTORS[node.type];
+        if (!executor) {
+          throw new Error('No executor found for node type: ' + node.type);
+        }
+
+        const outputs = await executor(node.config || {}, currentInputs, {
+          workflow: this.workflow,
+          executors: EXECUTORS,
+          nodeId: node.id,
+          executor: this,
+        });
+
+        this.results[node.id] = {
+          nodeId: node.id,
+          status: 'success',
+          output: outputs,
+          startedAt: this.results[node.id].startedAt,
+          finishedAt: Date.now(),
+        };
+
+        const outEdges = this.workflow.edges.filter((e) => e.source === currentNodeId);
+        if (outEdges.length === 0) {
+          return Object.values(outputs)[0] ?? outputs;
+        }
+
+        const nextEdge = outEdges[0];
+        currentNodeId = nextEdge.target;
+        currentInputs = {
+          [nextEdge.targetHandle]: Object.values(outputs)[0],
+        };
+      } catch (err) {
+        const errMsg = err.message || String(err);
+        this.results[node.id] = {
+          nodeId: node.id,
+          status: 'error',
+          error: errMsg,
+          startedAt: this.results[node.id].startedAt,
+          finishedAt: Date.now(),
+        };
+        throw err;
+      }
+    }
+
+    return currentInputs;
   }
 }
 
