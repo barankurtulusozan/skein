@@ -12,8 +12,7 @@ import {
 import { NODE_DEFINITIONS } from "../constants/nodeDefinitions";
 import { WorkflowExecutor } from "@skein/engine";
 
-const API_BASE = "http://localhost:3001/api";
-const WS_BASE = "ws://localhost:3001/ws";
+
 
 export interface ToastState {
   message: string;
@@ -147,8 +146,7 @@ const saveFlow = (nodes: Node[], edges: Edge[]) => {
     console.error("Failed to save workflow to localStorage", e);
   }
 };
-let socket: WebSocket | null = null;
-let reconnectTimeout: any = null;
+
 
 export const useWorkflowStore = create<WorkflowState>((set, get) => {
   const initialFlow = getSavedFlow();
@@ -536,6 +534,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => {
           nodes: nodes.map((n) => ({
             id: n.id,
             type: n.type || "manual-trigger",
+            position: n.position || { x: 0, y: 0 },
             config: n.data?.config || {},
           })),
           edges: edges.map((e) => ({
@@ -575,7 +574,7 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => {
           }));
         });
 
-        executor.on("run:complete", (results) => {
+        executor.on("run:complete", () => {
           get().showToast("Workflow run completed!", "success");
         });
 
