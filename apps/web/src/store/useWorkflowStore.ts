@@ -10,6 +10,7 @@ import {
   applyEdgeChanges,
 } from "@xyflow/react";
 import { NODE_DEFINITIONS } from "../constants/nodeDefinitions";
+import { WorkflowExecutor } from "@skein/engine";
 
 const API_BASE = "http://localhost:3001/api";
 const WS_BASE = "ws://localhost:3001/ws";
@@ -412,17 +413,21 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => {
       }));
     },
 
-    // --- Backend API Actions ---
+    // --- Local Storage API Actions ---
 
     fetchWorkflows: async () => {
       set({ isLoading: true });
       try {
-        const res = await fetch(`${API_BASE}/workflows`);
-        if (!res.ok) throw new Error("Failed to load workflows list.");
-        const list = await res.json();
+        const saved = localStorage.getItem("skein-workflows");
+        const list = saved ? JSON.parse(saved) : [];
+        if (list.length === 0) {
+          const initial = { ...DEFAULT_FLOW, createdAt: Date.now(), updatedAt: Date.now() };
+          list.push(initial);
+          localStorage.setItem("skein-workflows", JSON.stringify(list));
+        }
         set({ workflowsList: list });
       } catch (err: any) {
-        get().showToast(err.message || "API Server connection error", "error");
+        get().showToast("Failed to load workflows from localStorage", "error");
       } finally {
         set({ isLoading: false });
       }
@@ -433,29 +438,44 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => {
       const finalName = customName || activeWorkflowName;
       set({ isLoading: true });
       try {
-        const res = await fetch(`${API_BASE}/workflows`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            id: activeWorkflowId,
+        const saved = localStorage.getItem("skein-workflows");
+        const list = saved ? JSON.parse(saved) : [];
+        const existingIndex = list.findIndex((w: any) => w.id === activeWorkflowId);
+        const now = Date.now();
+
+        let updatedWorkflow: DbWorkflow;
+        if (existingIndex >= 0) {
+          updatedWorkflow = {
+            ...list[existingIndex],
             name: finalName,
             nodes,
             edges,
-          }),
+            updatedAt: now,
+          };
+          list[existingIndex] = updatedWorkflow;
+        } else {
+          updatedWorkflow = {
+            id: activeWorkflowId || `workflow-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+            name: finalName,
+            nodes,
+            edges,
+            createdAt: now,
+            updatedAt: now,
+          };
+          list.push(updatedWorkflow);
+        }
+
+        localStorage.setItem("skein-workflows", JSON.stringify(list));
+        get().showToast(`Workflow "${finalName}" saved locally.`, "success");
+        
+        set({
+          activeWorkflowId: updatedWorkflow.id,
+          activeWorkflowName: finalName,
         });
-
-        if (!res.ok) throw new Error("Failed to save workflow.");
-        await res.json();
-
-        get().showToast(
-          `Workflow "${finalName}" saved successfully.`,
-          "success",
-        );
-        set({ activeWorkflowName: finalName });
         saveFlow(nodes, edges);
         await get().fetchWorkflows();
       } catch (err: any) {
-        get().showToast(err.message || "Save error", "error");
+        get().showToast("Failed to save workflow locally", "error");
       } finally {
         set({ isLoading: false });
       }
@@ -464,9 +484,10 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => {
     loadWorkflow: async (id) => {
       set({ isLoading: true });
       try {
-        const res = await fetch(`${API_BASE}/workflows/${id}`);
-        if (!res.ok) throw new Error("Workflow details not found.");
-        const workflow = await res.json();
+        const saved = localStorage.getItem("skein-workflows");
+        const list = saved ? JSON.parse(saved) : [];
+        const workflow = list.find((w: any) => w.id === id);
+        if (!workflow) throw new Error("Workflow details not found locally.");
 
         set({
           activeWorkflowId: workflow.id,
@@ -482,19 +503,16 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => {
         saveFlow(workflow.nodes || [], workflow.edges || []);
         get().showToast(`Loaded workflow: "${workflow.name}"`, "success");
       } catch (err: any) {
-        get().showToast(err.message || "Load error", "error");
+        get().showToast(err.message || "Failed to load workflow", "error");
       } finally {
         set({ isLoading: false });
       }
     },
 
     runWorkflow: async (payload) => {
-      const { activeWorkflowId, nodes } = get();
+      const { activeWorkflowId, activeWorkflowName, nodes, edges } = get();
       if (!activeWorkflowId) {
-        get().showToast(
-          "Workflow context missing. Try saving first.",
-          "warning",
-        );
+        get().showToast("Workflow context missing.", "warning");
         return;
       }
 
@@ -509,98 +527,70 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => {
         nodeRunError: {},
       });
 
+      get().showToast("Workflow run started...", "success");
+
       try {
-        const res = await fetch(
-          `${API_BASE}/workflows/${activeWorkflowId}/run`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ payload }),
-          },
-        );
+        const workflowData = {
+          id: activeWorkflowId,
+          name: activeWorkflowName,
+          nodes: nodes.map((n) => ({
+            id: n.id,
+            type: n.type || "manual-trigger",
+            config: n.data?.config || {},
+          })),
+          edges: edges.map((e) => ({
+            id: e.id,
+            source: e.source,
+            target: e.target,
+            sourceHandle: e.sourceHandle || "",
+            targetHandle: e.targetHandle || "",
+          })),
+        };
 
-        if (!res.ok) throw new Error("Run trigger request failed.");
-        const { runId } = await res.json();
+        const executor = new WorkflowExecutor(workflowData);
 
-        get().showToast(`Execution run started (ID: ${runId})`, "success");
+        executor.on("node:start", (nodeId) => {
+          set((state) => ({
+            nodeRunStatus: { ...state.nodeRunStatus, [nodeId]: "running" },
+          }));
+        });
+
+        executor.on("node:success", (nodeId, output) => {
+          set((state) => ({
+            nodeRunStatus: { ...state.nodeRunStatus, [nodeId]: "success" },
+            nodeRunOutput: { ...state.nodeRunOutput, [nodeId]: output },
+          }));
+        });
+
+        executor.on("node:skipped", (nodeId) => {
+          set((state) => ({
+            nodeRunStatus: { ...state.nodeRunStatus, [nodeId]: "skipped" },
+          }));
+        });
+
+        executor.on("node:error", (nodeId, error) => {
+          set((state) => ({
+            nodeRunStatus: { ...state.nodeRunStatus, [nodeId]: "error" },
+            nodeRunError: { ...state.nodeRunError, [nodeId]: error },
+          }));
+        });
+
+        executor.on("run:complete", (results) => {
+          get().showToast("Workflow run completed!", "success");
+        });
+
+        executor.on("run:error", (error) => {
+          get().showToast(`Workflow run aborted: ${error}`, "error");
+        });
+
+        await executor.execute(payload || {});
       } catch (err: any) {
-        get().showToast(err.message || "Trigger error", "error");
+        get().showToast(`Execution error: ${err.message}`, "error");
       }
     },
 
     initializeWebSocket: () => {
-      if (socket) return; // Already initialized
-
-      const connect = () => {
-        console.log("[WebSocket]: Connecting to streaming endpoint...");
-        socket = new WebSocket(WS_BASE);
-
-        socket.onopen = () => {
-          console.log("[WebSocket]: Connected to streaming endpoint");
-        };
-
-        socket.onmessage = (event) => {
-          const data = JSON.parse(event.data);
-          const { activeWorkflowId, nodes } = get();
-
-          // Only process events related to the active workflow on the canvas
-          if (data.workflowId !== activeWorkflowId) return;
-
-          const { event: wsEvent, nodeId, output, error } = data;
-
-          if (wsEvent === "run:start") {
-            const initialStatus: Record<string, any> = {};
-            nodes.forEach((n) => {
-              initialStatus[n.id] = "idle";
-            });
-            set({
-              nodeRunStatus: initialStatus,
-              nodeRunOutput: {},
-              nodeRunError: {},
-            });
-            get().showToast("Workflow run started...", "success");
-          } else if (wsEvent === "node:start") {
-            set((state) => ({
-              nodeRunStatus: { ...state.nodeRunStatus, [nodeId]: "running" },
-            }));
-          } else if (wsEvent === "node:success") {
-            set((state) => ({
-              nodeRunStatus: { ...state.nodeRunStatus, [nodeId]: "success" },
-              nodeRunOutput: { ...state.nodeRunOutput, [nodeId]: output },
-            }));
-          } else if (wsEvent === "node:skipped") {
-            set((state) => ({
-              nodeRunStatus: { ...state.nodeRunStatus, [nodeId]: "skipped" },
-            }));
-          } else if (wsEvent === "node:error") {
-            set((state) => ({
-              nodeRunStatus: { ...state.nodeRunStatus, [nodeId]: "error" },
-              nodeRunError: { ...state.nodeRunError, [nodeId]: error },
-            }));
-          } else if (wsEvent === "run:complete" || wsEvent === "run:error") {
-            get().showToast(
-              wsEvent === "run:complete"
-                ? "Workflow run completed!"
-                : `Workflow run aborted: ${error}`,
-              wsEvent === "run:complete" ? "success" : "error",
-            );
-          }
-        };
-
-        socket.onclose = () => {
-          console.log("[WebSocket]: Disconnected. Reconnecting in 3s...");
-          socket = null;
-          clearTimeout(reconnectTimeout);
-          reconnectTimeout = setTimeout(connect, 3000);
-        };
-
-        socket.onerror = (err) => {
-          console.error("[WebSocket] Error:", err);
-          socket?.close();
-        };
-      };
-
-      connect();
+      console.log("[WebSocket]: Client-side execution mode active. Bypassing socket connection.");
     },
 
     createNewWorkflow: () => {
