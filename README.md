@@ -2,6 +2,8 @@
 
 Skein is a high-performance, interactive visual workflow builder and framework-agnostic AI-agent execution runtime. Decoupled into a clean Turborepo monorepo, it offers type-safe node connection validation, real-time live execution updates over WebSockets, repeatable cron scheduling, and standalone workflow code compilation.
 
+![Skein Visual Workflow Editor](designs/editor/screen.png)
+
 ---
 
 ## ✨ Key Features
