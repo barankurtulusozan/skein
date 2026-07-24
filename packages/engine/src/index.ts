@@ -8,15 +8,51 @@ import { NODE_EXECUTORS } from "@skein/nodes";
 import { topoSort } from "./topoSort";
 import { EventEmitter } from "./eventEmitter";
 
+import { ExecutionObserver, ExecutionEvent } from "./observer";
+
 export class WorkflowExecutor extends EventEmitter {
   private workflow: Workflow;
   private customExecutors: Record<string, any>;
   private results: Record<string, NodeRunResult> = {};
+  private observer?: ExecutionObserver;
+  private runId: string;
 
-  constructor(workflow: Workflow, customExecutors: Record<string, any> = {}) {
+  constructor(
+    workflow: Workflow,
+    customExecutors: Record<string, any> = {},
+    observer?: ExecutionObserver,
+    runId?: string
+  ) {
     super();
     this.workflow = workflow;
     this.customExecutors = customExecutors;
+    this.observer = observer;
+    this.runId = runId || workflow.id;
+  }
+
+  private dispatchEvent(
+    type: ExecutionEvent["type"],
+    nodeId?: string,
+    data?: any
+  ) {
+    if (this.observer) {
+      const event: ExecutionEvent = {
+        specversion: "1.0",
+        type,
+        source: "/skein/engine",
+        id: `evt-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+        time: Date.now(),
+        runId: this.runId,
+        workflowId: this.workflow.id,
+        nodeId,
+        data,
+      };
+      try {
+        this.observer.onEvent(event);
+      } catch (err) {
+        console.error("Error in ExecutionObserver listener:", err);
+      }
+    }
   }
 
   async execute(
@@ -26,6 +62,8 @@ export class WorkflowExecutor extends EventEmitter {
     topoSort(this.workflow);
 
     this.emit("run:start", this.workflow.id);
+    this.dispatchEvent("com.skein.workflow.run.start");
+
 
     // Initialize all node results
     this.workflow.nodes.forEach((node) => {
@@ -109,6 +147,7 @@ export class WorkflowExecutor extends EventEmitter {
           finishedAt: Date.now(),
         };
         this.emit("node:skipped", nodeId);
+        this.dispatchEvent("com.skein.workflow.node.skipped", nodeId);
 
         // Propagate skipped state to all downstream nodes
         adjList[nodeId].forEach((childId) => {
@@ -121,6 +160,7 @@ export class WorkflowExecutor extends EventEmitter {
           startedAt: Date.now(),
         };
         this.emit("node:start", nodeId);
+        this.dispatchEvent("com.skein.workflow.node.start", nodeId);
 
         try {
           const activeExecutors = {
@@ -147,6 +187,7 @@ export class WorkflowExecutor extends EventEmitter {
             finishedAt: Date.now(),
           };
           this.emit("node:success", nodeId, output);
+          this.dispatchEvent("com.skein.workflow.node.success", nodeId, { output });
         } catch (err: any) {
           const errMsg = err.message || String(err);
           this.results[nodeId] = {
@@ -157,6 +198,7 @@ export class WorkflowExecutor extends EventEmitter {
             finishedAt: Date.now(),
           };
           this.emit("node:error", nodeId, errMsg);
+          this.dispatchEvent("com.skein.workflow.node.error", nodeId, { error: errMsg });
 
           // Mark all remaining downstream children as skipped
           const skipDownstream = (id: string) => {
@@ -203,10 +245,12 @@ export class WorkflowExecutor extends EventEmitter {
 
     if (runErrorOccurred) {
       this.emit("run:error", runErrorOccurred.message);
+      this.dispatchEvent("com.skein.workflow.run.error", undefined, { error: runErrorOccurred.message });
       throw runErrorOccurred;
     }
 
     this.emit("run:complete", this.results);
+    this.dispatchEvent("com.skein.workflow.run.complete", undefined, { results: this.results });
     return this.results;
   }
 
@@ -227,6 +271,7 @@ export class WorkflowExecutor extends EventEmitter {
         startedAt: Date.now(),
       };
       this.emit("node:start", node.id);
+      this.dispatchEvent("com.skein.workflow.node.start", node.id);
 
       try {
         const activeExecutors = {
@@ -253,6 +298,7 @@ export class WorkflowExecutor extends EventEmitter {
           finishedAt: Date.now(),
         };
         this.emit("node:success", node.id, outputs);
+        this.dispatchEvent("com.skein.workflow.node.success", node.id, { output: outputs });
 
         // Find next edge in the subpath
         const outEdges = this.workflow.edges.filter(
