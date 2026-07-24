@@ -1,11 +1,13 @@
 import Fastify from "fastify";
 import cors from "@fastify/cors";
 import websocket from "@fastify/websocket";
-import { WorkflowExecutor } from "@skein/engine";
+import { WorkflowExecutor, CompositeExecutionObserver } from "@skein/engine";
 import { generateStandaloneCode } from "@skein/export-codegen";
 import { db, DbWorkflow, DbRun } from "./db";
 import { scheduler } from "./scheduler";
 import { randomUUID } from "crypto";
+import { WebSocketBroadcasterAdapter } from "./adapters/websocketAdapter";
+import { DbPersistenceAdapter } from "./adapters/dbAdapter";
 
 const fastify = Fastify({
   logger: true,
@@ -61,7 +63,6 @@ async function triggerWorkflowExecution(
   initialPayload: Record<string, any> = {},
 ): Promise<string> {
   const runId = randomUUID();
-  const executor = new WorkflowExecutor(workflow);
 
   const activeRun: DbRun = {
     id: runId,
@@ -74,71 +75,12 @@ async function triggerWorkflowExecution(
   // Save initial run log
   await db.saveRun(activeRun);
 
-  broadcast({ event: "run:start", runId, workflowId: workflow.id });
+  const observer = new CompositeExecutionObserver([
+    new WebSocketBroadcasterAdapter(clients),
+    new DbPersistenceAdapter(activeRun),
+  ]);
 
-  // Listen to engine steps and broadcast + persist state updates
-  executor.on("node:start", async (nodeId) => {
-    activeRun.results[nodeId] = {
-      nodeId,
-      status: "running",
-      startedAt: Date.now(),
-    };
-    await db.saveRun(activeRun);
-    broadcast({ event: "node:start", runId, workflowId: workflow.id, nodeId });
-  });
-
-  executor.on("node:success", async (nodeId, output) => {
-    const prev = activeRun.results[nodeId] || {};
-    activeRun.results[nodeId] = {
-      ...prev,
-      nodeId,
-      status: "success",
-      output,
-      finishedAt: Date.now(),
-    };
-    await db.saveRun(activeRun);
-    broadcast({ event: "node:success", runId, workflowId: workflow.id, nodeId, output });
-  });
-
-  executor.on("node:skipped", async (nodeId) => {
-    const prev = activeRun.results[nodeId] || {};
-    activeRun.results[nodeId] = {
-      ...prev,
-      nodeId,
-      status: "skipped",
-      finishedAt: Date.now(),
-    };
-    await db.saveRun(activeRun);
-    broadcast({ event: "node:skipped", runId, workflowId: workflow.id, nodeId });
-  });
-
-  executor.on("node:error", async (nodeId, error) => {
-    const prev = activeRun.results[nodeId] || {};
-    activeRun.results[nodeId] = {
-      ...prev,
-      nodeId,
-      status: "error",
-      error,
-      finishedAt: Date.now(),
-    };
-    await db.saveRun(activeRun);
-    broadcast({ event: "node:error", runId, workflowId: workflow.id, nodeId, error });
-  });
-
-  // Handle final completion
-  executor.on("run:complete", async (results) => {
-    activeRun.status = "success";
-    activeRun.finishedAt = Date.now();
-    await db.saveRun(activeRun);
-    broadcast({ event: "run:complete", runId, workflowId: workflow.id, results });
-  });
-
-  executor.on("run:error", async (error) => {
-    activeRun.status = "error";
-    activeRun.finishedAt = Date.now();
-    await db.saveRun(activeRun);
-    broadcast({ event: "run:error", runId, workflowId: workflow.id, error });
-  });
+  const executor = new WorkflowExecutor(workflow, {}, observer, runId);
 
   // Run execution in the background asynchronously
   executor.execute(initialPayload).catch((err) => {

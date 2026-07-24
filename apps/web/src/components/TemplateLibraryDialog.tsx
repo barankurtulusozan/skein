@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { WORKFLOW_TEMPLATES, WorkflowTemplate } from "../constants/templates";
 import { useWorkflowStore } from "../store/useWorkflowStore";
 
