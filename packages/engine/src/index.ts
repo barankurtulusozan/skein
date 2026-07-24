@@ -289,3 +289,6 @@ export class WorkflowExecutor extends EventEmitter {
 export function runWorkflow(workflow: any): string {
   return `Engine executing workflow: ${workflow.name}`;
 }
+
+export * from "./observer";
+
