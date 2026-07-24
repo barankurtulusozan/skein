@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect, useCallback, DragEvent } from "react";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -46,13 +46,13 @@ function WorkflowCanvas() {
   const { screenToFlowPosition } = useReactFlow();
 
   // Drag and drop handlers
-  const onDragOver = useCallback((event: React.DragEvent) => {
+  const onDragOver = useCallback((event: DragEvent) => {
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
   }, []);
 
   const onDrop = useCallback(
-    (event: React.DragEvent) => {
+    (event: DragEvent) => {
       event.preventDefault();
 
       const type = event.dataTransfer.getData("application/reactflow");

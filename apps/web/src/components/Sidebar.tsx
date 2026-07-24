@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState, DragEvent } from "react";
 import {
   NODE_DEFINITIONS,
   UINodeDefinition,
@@ -7,7 +7,7 @@ import {
 export default function Sidebar() {
   const [search, setSearch] = useState("");
 
-  const onDragStart = (event: React.DragEvent, nodeType: string) => {
+  const onDragStart = (event: DragEvent, nodeType: string) => {
     event.dataTransfer.setData("application/reactflow", nodeType);
     event.dataTransfer.effectAllowed = "move";
   };

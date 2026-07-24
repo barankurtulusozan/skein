@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, ChangeEvent } from "react";
 import { useWorkflowStore } from "../store/useWorkflowStore";
 import TemplateLibraryDialog from "./TemplateLibraryDialog";
 
@@ -58,7 +58,7 @@ export default function Topbar() {
     fileInputRef.current?.click();
   };
 
-  const handleImportFile = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportFile = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
