@@ -96,32 +96,13 @@ const serializeState = (nodes: Node[], edges: Edge[]) => {
   });
 };
 
+import { AI_SUPPORT_ROUTER_TEMPLATE } from "../constants/templates";
+
 const DEFAULT_FLOW = {
-  id: "default-workflow",
-  name: "Default Workflow",
-  nodes: [
-    {
-      id: "node-trigger",
-      type: "manual-trigger",
-      position: { x: 100, y: 150 },
-      data: { config: { defaultPayload: '{\n  "message": "hello"\n}' } },
-    },
-    {
-      id: "node-log",
-      type: "log-debug",
-      position: { x: 500, y: 150 },
-      data: { config: {} },
-    },
-  ],
-  edges: [
-    {
-      id: "e-node-trigger-payload-node-log-data",
-      source: "node-trigger",
-      sourceHandle: "payload",
-      target: "node-log",
-      targetHandle: "data",
-    },
-  ],
+  id: AI_SUPPORT_ROUTER_TEMPLATE.id,
+  name: AI_SUPPORT_ROUTER_TEMPLATE.name,
+  nodes: AI_SUPPORT_ROUTER_TEMPLATE.nodes,
+  edges: AI_SUPPORT_ROUTER_TEMPLATE.edges,
 };
 
 const getSavedFlow = () => {
@@ -418,9 +399,8 @@ export const useWorkflowStore = create<WorkflowState>((set, get) => {
       try {
         const saved = localStorage.getItem("skein-workflows");
         const list = saved ? JSON.parse(saved) : [];
-        if (list.length === 0) {
-          const initial = { ...DEFAULT_FLOW, createdAt: Date.now(), updatedAt: Date.now() };
-          list.push(initial);
+        if (!list.some((w: any) => w.id === AI_SUPPORT_ROUTER_TEMPLATE.id)) {
+          list.unshift({ ...DEFAULT_FLOW, createdAt: Date.now(), updatedAt: Date.now() });
           localStorage.setItem("skein-workflows", JSON.stringify(list));
         }
         set({ workflowsList: list });
